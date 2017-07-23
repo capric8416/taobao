@@ -6,6 +6,16 @@
 # http://doc.scrapy.org/en/latest/topics/spider-middleware.html
 
 from scrapy import signals
+from .ProxySwift import ProxyPool
+proxy_pool = ProxyPool()
+
+
+def change_ip(request):
+    proxy_server = request.meta['proxy']
+    for ip in proxy_pool.pool:
+        if proxy_server == "http://%(ip)s:%(port)s" % ip:
+            proxy_pool.change_ip(ip)
+            break
 
 
 class TaobaoSukSpiderMiddleware(object):
