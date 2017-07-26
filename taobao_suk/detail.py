@@ -64,15 +64,12 @@ def tianmao_m_pag(response):
         'original_price': '//section[@id="s-price"]//span[@class="mui-price-integer"]/text()',  # 原价格
     }
     tree = etree.HTML(response.text)
-
     item = {}
     for key in xpath_item:
         item[key] = ''.join(tree.xpath(xpath_item[key]))
 
     products = ''.join(tree.xpath('//div[@class="mui-standardItemProps mdv-standardItemProps"]/@mdv-cfg'))
-    props = json.loads(products).get('data', {}).get('props', [])
-    #{"data": {"props": [{"ptext": "品牌", "vtexts": ["jayjun"]}, {"vtexts": ["韩国"], "ptext": "产地"},
-    #                    {"vtexts": ["2015年"], "ptext": "上市时间"}, {"vtexts": ["保湿补水", "深层清洁", "美白保湿"], "ptext": "功效"}]}}
+    props = json.loads(products).get('data', {}).get('props', []) if products else {}
 
     key_item = {
         '品牌': 'brand',
@@ -81,7 +78,8 @@ def tianmao_m_pag(response):
         '功效': 'effect',
         '月份': 'month',
         '保质期': 'shelf_life',
-        '适合肤质': 'suitable_skin'}
+        '适合肤质': 'suitable_skin'
+    }
     for data in props:
         key = data.get('ptext', '')
         if key in key_item:
@@ -89,12 +87,15 @@ def tianmao_m_pag(response):
 
     text = response.text
     item['sell_count'] = re.search(r'"sellCount":(\d*?)\,', text).group(1)  # 销量
-    item['price'] = re.search(r'"price":"(\d.*?\d)\"\,', text)   # 促销价
+    # item['price'] = re.search(r'"price":"(\d.*?\d)\"\,', text)   # 促销价
     item['deliveryAddress'] = re.search(r'"deliveryAddress":"(.*?)\"\,', text).group(1) # 发货地
     item['rate_counts'] = re.search(r'"rateCounts":(\d*?)\,', text).group(1) # 累计评价
     item['totalQuantity'] = re.search(r'"totalQuantity":(\d*?)\,', text).group(1)  # 库存
     item['goods_id'] = re.search(r'id=(\d*)', response.url).group(1)
+    json_text  = re.search(r'var _DATA_Mdskip =\s({.*?})\s</script>', text).group(1)
+    item['price'] = json.loads(json_text).get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
+    print (item)
 
+# if __name__ == '__main__':
 
-if __name__ == '__main__':
-    tianmao_m_pag(text)
+    # tianmao_m_pag(text)
