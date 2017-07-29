@@ -20,6 +20,8 @@ REDIS_HOST = os.environ.get('REDIS_HOST', '10.0.54.45')
 # REDIS_HOST = os.environ.get('REDIS_HOST', '192.168.131.128')
 REDIS_PORT = int(os.environ.get('REDIS_PORT', 6378))
 
+if os.environ.get('REDIS_URL', None):
+    REDIS_URL = os.environ.get('REDIS_URL')
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'taobao_suk (+http://www.yourdomain.com)'
 
@@ -79,7 +81,10 @@ ITEM_PIPELINES = {
 import os
 MONGODB_HOST = os.environ.get('MONGODB_HOST', '10.0.54.45')
 MONGODB_PORT = os.environ.get('MONGODB_PORT', '27017')
-MONGODB_URI = 'mongodb://{}:{}'.format(MONGODB_HOST, MONGODB_PORT)
+if os.environ.get('MONGO_URL', None):
+    MONGODB_URI = os.environ.get('MONGO_URL')
+else:
+    MONGODB_URI = 'mongodb://{}:{}'.format(MONGODB_HOST, MONGODB_PORT)
 MONGODB_DATABASE = os.environ.get('MONGODB_DATABASE', 'test')
 
 # retry #

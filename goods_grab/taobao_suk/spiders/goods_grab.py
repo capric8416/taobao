@@ -142,10 +142,11 @@ class GoodsGrab(RedisSpider):
 
         text = response.text
         item['sell_count'] = re.search(r'"sellCount":(\d*?)\,', text).group(1)  # 销量
-        item['price'] = re.search(r'"price":"(\d.*?\d)\"\,', text)  # 促销价
         item['deliveryAddress'] = re.search(r'"deliveryAddress":"(.*?)\"\,', text).group(1)  # 发货地
         item['rate_counts'] = re.search(r'"rateCounts":(\d*?)\,', text).group(1)  # 累计评价
         item['totalQuantity'] = re.search(r'"totalQuantity":(\d*?)\,', text).group(1)  # 库存
         item['goods_id'] = re.search(r'id=(\d*)', response.url).group(1)
+        json_text = re.search(r'var _DATA_Mdskip =\s({.*?})\s</script>', text).group(1)
+        item['price'] = json.loads(json_text).get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
 
         return item

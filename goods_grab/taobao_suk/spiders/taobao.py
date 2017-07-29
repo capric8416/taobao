@@ -4,6 +4,7 @@ import itertools
 import furl
 import re
 import redis
+import os
 import lxml
 import json
 from taobao_suk import items
@@ -14,8 +15,13 @@ class TaobaoSpider(scrapy.Spider):
     allowed_domains = ["taobao.com", "tmall.hk", "tmall.com"]
     start_urls = ['http://taobao.com/']
 
-    pool = redis.ConnectionPool(host='10.0.54.45', port=6378)
-    rds = redis.Redis(connection_pool=pool)
+    redis_url = os.environ.get('REDIS_URL', None)
+    if redis_url:
+        pool = redis.ConnectionPool.from_url(redis_url)
+        rds = redis.StrictRedis(connection_pool=pool)
+    else:
+        pool = redis.ConnectionPool(host='10.54.45', port=6378)
+        rds = redis.StrictRedis(connection_pool=pool)
 
     def start_requests(self):
 
@@ -83,8 +89,7 @@ class TaobaoSpider(scrapy.Spider):
             shop_info['url'] = 'https:{}'.format(item['shopUrl'])
 
             self.rds.sadd('shop_urls', json.dumps(('https:{}'.format(item['shopUrl']),
-                                                   response.meta['word'],
-                                                   '天猫' if response.meta['shop_type'] else '淘宝')))
+                                                   response.meta['word'])))
             yield items.TaobaoSukItem(detail={'shop_info': shop_info})
 
         # 翻页
@@ -98,105 +103,3 @@ class TaobaoSpider(scrapy.Spider):
                 furl_obj.args['s'] = 20
             next_url = furl_obj.url
             yield scrapy.Request(next_url, callback=self.parse, meta=response.meta)
-
-    def get_shop_id(self, response):
-        # shop_id = re.findall(r'data-widgetid="(\d*?)"', response.text)[4]
-
-        # https://dcxgz.taobao.com/i/asynSearch.htm?callback=jsonp273&mid=w-15094675485-0&wid=15094675485&path=/view_shop.htm&search=y&keyword=papa+recip
-        base_url = 'https://{}/i/asynSearch.htm?callback=jsonp273&mid=w-{}-0&wid={}' \
-                   '&path=/view_shop.htm&search=y&keyword={}'
-
-        tianmao_base_url = 'https://{}/i/asynSearch.htm?callback=jsonp126&mid=w-{}-0&wid={}' \
-                   '&path=/view_shop.htm&search=y&keyword={}'
-
-        host = response.url.split('/')[2]
-
-        if host.endswith('tmall.hk') or host.endswith('tmall.com'):
-            shop_id = response.xpath(
-                '//div[@class="layout grid-s5m0 J_TLayout"]/div/div/div[@class="J_TModule"][1]/@data-widgetid').extract_first()
-            url = tianmao_base_url.format(host, shop_id, shop_id, 'papa recipe')
-            yield scrapy.Request(url, callback=self.shop_search_pag)
-        elif host.endswith('taobao.com'):
-            # url = 'https://{}' + response.xpath("//input[@id='J_ShopAsynSearchURL']/@value").extract_first() \
-            #       + '&keyword={}'
-            # url = url.format(host, response.meta['world'])
-
-            # shop_id = re.findall(r'wid=(\d*)',  response.xpath("//input[@id='J_ShopAsynSearchURL']/@value").extract_first())[0]
-            # url = base_url.format(host, shop_id, shop_id, response.meta['world'])
-            # yield scrapy.Request(url, callback=self.shop_search_pag)
-
-
-            # response.xpath(
-            #     '//div[@class="layout grid-s5m0 J_TLayout"]/div/div/div[@class="J_TModule"][1]/@data-widgetid')\
-            #     .extract_first()
-            base_url = 'https://{}/i/asynSearch.htm?callback=jsonp110&mid=w-{}-0&wid={}' \
-                       '&path=/view_shop.htm&search=y&keyword={}'
-            shop_id = re.findall(r'data-widgetid="(\d*?)"', response.text)[4]
-            url = base_url.format(host, shop_id, shop_id, 'papa recipe')
-            yield scrapy.Request(url, callback=self.shop_search_pag)
-
-
-
-    def shop_search_pag(self, response):
-        headers = {
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36'
-        }
-
-        if 'tmall.hk' in response.url or 'tmall.com' in response.url:
-            # 60
-            text_base = response.text.partition('本店内推荐')[0]
-            url_list = set(re.findall(r'item.htm\?id=\d+', text_base))
-            for url in url_list:
-                host = response.url.split('/')[2].split('.')[-1]
-                url_ = 'https://detail.m.tmall.{}/{}'.format(host, url)
-                yield scrapy.Request(url_, callback=self.tianmao_m_pag, headers=headers)
-
-            # 翻页
-            if '没找到符合条件的商品,换个条件或关键词试试吧' not in response.text:
-                pass
-                furl_obj = furl.furl(response.url)
-                if furl_obj.args.get('pageNo', None):
-                    furl_obj.args['pageNo'] = int(furl_obj.args['pageNo']) + 1
-                else:
-                    furl_obj.args['pageNo'] = 2
-                yield scrapy.Request(furl_obj.url, callback=self.shop_search_pag)
-
-        elif 'taobao.com' in response.url:
-            # 24
-            pass
-
-
-
-            # r'<a class=\"item-name J_TGoldData\" href=\"//item.taobao.com/item.htm\?id=\d+\"'
-            url_list = set(re.findall(r'item.htm\?id=\d+', response.text.partition('其他人还购买了')[0]))
-            for url in url_list:
-                url_ = 'https://item.taobao.com/{}'.format(url)
-                yield scrapy.Request(url_, callback=self.goods_pag, headers=headers)
-
-            # 翻页
-
-            goods_num = re.findall(r'共搜索到<span> (\d*?) </span>个符合条件的商品', response.text)
-            # if int(goods_num[0]):
-            #     return
-            try:
-                int(goods_num[0])
-            except:
-                pass
-                print('-----------')
-
-            if int(goods_num[0]):
-                pass
-                furl_obj = furl.furl(response.url)
-                if furl_obj.args.get('pageNo', None):
-                    furl_obj.args['pageNo'] = int(furl_obj.args['pageNo']) + 1
-                else:
-                    furl_obj.args['pageNo'] = 2
-                yield scrapy.Request(furl_obj.url, callback=self.shop_search_pag)
-            else:
-                pass
-
-
-
-
-
-

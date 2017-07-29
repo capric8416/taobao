@@ -8,13 +8,13 @@ from scrapy.utils.gz import gunzip, is_gzipped
 from scrapy.exceptions import IgnoreRequest
 from scrapy import signals
 from .ProxySwift import ProxyPool
-from taobao_suk.ProxySwift import cmdline
-from taobao_suk.ProxySwift.ProxyPool import *
+# from taobao_suk.ProxySwift import cmdline
+# from taobao_suk.ProxySwift.ProxyPool import *
 import datetime
 import logging
 proxy_pool = ProxyPool()
 
-cmdline.refresh_ip()
+# cmdline.refresh_ip()
 
 
 logger = logging.getLogger(__name__)
@@ -67,8 +67,8 @@ def change_ip(request):
     proxy_server = request.meta['proxy']
     for ip in proxy_pool.pool:
         if proxy_server == "http://%(ip)s:%(port)s" % ip:
-            # proxy_pool.change_ip(proxy_server)
-            cmdline.change_ip(proxy_server)
+            proxy_pool.change_ip(proxy_server)
+            # cmdline.change_ip(proxy_server)
             break
 
 

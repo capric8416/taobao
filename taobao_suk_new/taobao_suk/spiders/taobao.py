@@ -5,6 +5,7 @@ import furl
 import re
 import os
 import redis
+import datetime
 import lxml
 import json
 from taobao_suk import items
@@ -81,6 +82,7 @@ class TaobaoSpider(scrapy.Spider):
             shop_info['shop_deng_ji'] = item['shopIcon']['iconClass']
             shop_info['shop_type'] = '天猫' if response.meta['shop_type'] else '淘宝'
             shop_info['url'] = 'https:{}'.format(item['shopUrl'])
+            shop_info['modified'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
             self.rds.sadd('shop_urls', json.dumps(('https:{}'.format(item['shopUrl']), response.meta['word'])))
             yield items.TaobaoSukItem(detail={'shop_info': shop_info})
