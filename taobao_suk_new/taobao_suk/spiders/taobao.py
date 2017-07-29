@@ -3,6 +3,7 @@ import scrapy
 import itertools
 import furl
 import re
+import os
 import redis
 import lxml
 import json
