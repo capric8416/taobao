@@ -81,7 +81,7 @@ ITEM_PIPELINES = {
 import os
 MONGODB_HOST = os.environ.get('MONGODB_HOST', '10.0.54.45')
 MONGODB_PORT = os.environ.get('MONGODB_PORT', '27017')
-MONGODB_URI = 'mongodb://{}:{}'.format(MONGODB_HOST, MONGODB_PORT)
+MONGODB_URI = os.environ.get('MONGO_URL')
 MONGODB_DATABASE = os.environ.get('MONGODB_DATABASE', 'test')
 
 # retry #
