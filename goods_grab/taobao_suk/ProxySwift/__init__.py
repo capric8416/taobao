@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     p = ProxySwift()
     # 参数为 ip的id
-    # p.changes_ip(24)
+    p.changes_ip(26)
     # 参数也为ip的id，不给时  获取所有ip
     print(p.get_ip())
     # import requests
