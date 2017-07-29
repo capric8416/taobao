@@ -1,0 +1,9 @@
+scrapy
+scrapy-redis
+furl
+fire
+pymongo
+redis
+requests
+pyquery
+selenium
