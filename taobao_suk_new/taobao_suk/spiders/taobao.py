@@ -5,7 +5,7 @@ import furl
 import re
 import os
 import redis
-import datetime
+from datetime import datetime
 import lxml
 import json
 from taobao_suk import items
