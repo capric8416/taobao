@@ -52,7 +52,7 @@ class GetShopItem(object):
         self.max_pages = max_pages
         self.proxy = proxy
 
-        self.key_shop = 'shops'
+        self.key_shop = 'shop_urls'
         self.key_item = 'goods_grab:start_urls'
         self.key_goods = 'goods'
         self.redis = redis.from_url(redis_url)
