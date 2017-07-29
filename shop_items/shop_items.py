@@ -3,6 +3,7 @@
 
 from proxy_swift import *
 
+from datetime import datetime
 import json
 import logging
 import logging.handlers
@@ -52,7 +53,7 @@ class GetShopItem(object):
         self.proxy = proxy
 
         self.key_shop = 'shops'
-        self.key_item = 'items'
+        self.key_item = 'goods_grab:start_urls'
         self.key_goods = 'goods'
         self.redis = redis.from_url(redis_url)
 
@@ -107,7 +108,7 @@ class GetShopItem(object):
         self.browser.service.process.send_signal(signal.SIGTERM)
         self.browser.quit()
 
-    def find_taobao_goods(self):
+    def find_taobao_goods(self, keyword):
         try:
             for a in self.browser.find_elements_by_xpath('//ul[@class="goods-list-items"]//a'):
                 goods_url = a.get_attribute('href')
@@ -121,22 +122,26 @@ class GetShopItem(object):
                     'id': goods_id,
                     'url': goods_url,
                     'from': '淘宝',
+                    'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
+                    'modified': datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
                     'image': left.find_element_by_xpath('child::img').get_attribute('src'),
                     'title': right.find_element_by_xpath('child::h3[@class="d-title"]').text,
                     'price_highlight': right.find_element_by_xpath('child::p[@class="d-price"]/em[@class="h"]').text,
                     'price_del': right.find_element_by_xpath('child::p[@class="d-price"]/del').text,
                     'sales_volume': right.find_element_by_xpath('child::p[@class="info"]/span[@class="d-num"]/em').text
                 }
-                goods_info = json.dumps(obj=goods_info, ensure_ascii=False, sort_keys=True)
 
                 self.logger.info('goods: {}'.format(goods_info))
                 self.redis.sadd(self.key_item, goods_url)
-                self.redis.hset(self.key_goods, goods_id, goods_info)
+                self.redis.hset(
+                    '{}@{}'.format(self.key_goods, goods_info['modified'].split()[0]),
+                    goods_id, json.dumps(obj=goods_info, ensure_ascii=False, sort_keys=True)
+                )
         except Exception as e:
             self.logger.warning(e)
 
-    def find_tmall_goods(self):
+    def find_tmall_goods(self, keyword):
         try:
             for a in self.browser.find_elements_by_xpath('//div[@class="tile_box"]//a[@class="tile_item"]'):
                 goods_url = a.get_attribute('href')
@@ -147,7 +152,9 @@ class GetShopItem(object):
                     'id': goods_id,
                     'url': goods_url,
                     'from': '天猫',
+                    'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
+                    'modified': datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
                     'image': a.find_element_by_xpath('descendant::img[@class="ti_img"]').get_attribute('src'),
                     'title': a.find_element_by_xpath('descendant::div[@class="tii_title"]/h3').text,
                     'price_highlight': a.find_element_by_xpath('descendant::div[@class="tii_price"]').text.split()[0],
@@ -157,15 +164,17 @@ class GetShopItem(object):
                 }
                 goods_info['price_highlight'] = re.sub(r'.*?(\d+).*', r'\g<1>', goods_info['price_highlight'])
                 goods_info['sales_volume'] = re.sub(r'.*?(\d+).*', r'\g<1>', goods_info['sales_volume'])
-                goods_info = json.dumps(obj=goods_info, ensure_ascii=False, sort_keys=True)
 
                 self.logger.info('goods: {}'.format(goods_info))
                 self.redis.sadd(self.key_item, goods_url)
-                self.redis.hset(self.key_goods, goods_id, goods_info)
+                self.redis.hset(
+                    '{}@{}'.format(self.key_goods, goods_info['modified'].split()[0]),
+                    goods_id, json.dumps(obj=goods_info, ensure_ascii=False, sort_keys=True)
+                )
         except Exception as e:
             self.logger.warning(e)
 
-    def traversal_tabao_shop(self):
+    def traversal_tabao_shop(self, keyword):
         pages = 0
 
         try:
@@ -175,7 +184,7 @@ class GetShopItem(object):
         except Exception as e:
             _ = e
         else:
-            self.find_taobao_goods()
+            self.find_taobao_goods(keyword)
 
             # 下一页
             xpath = (
@@ -191,7 +200,7 @@ class GetShopItem(object):
                     _ = e
                     break
                 else:
-                    self.find_taobao_goods()
+                    self.find_taobao_goods(keyword)
 
         return pages
 
@@ -224,7 +233,7 @@ class GetShopItem(object):
                 else:
                     break
 
-            self.find_tmall_goods()
+            self.find_tmall_goods(keyword)
 
         return pages
 
@@ -251,7 +260,7 @@ class GetShopItem(object):
             # # 测试天猫
             # keyword = 'AHC'
             # request_url = 'https://shop114223508.m.taobao.com/#list?q=AHC'
-            # # 测试淘宝
+            # 测试淘宝
             # keyword = '%E9%9F%A9%E5%9B%BD'
             # request_url = 'https://shop34135992.m.taobao.com/#list?q=%E9%9F%A9%E5%9B%BD'
 
@@ -268,7 +277,7 @@ class GetShopItem(object):
                 pages += self.traversal_tmall_shop(p2=p2, keyword=keyword)
             else:
                 # 淘宝
-                pages += self.traversal_tabao_shop()
+                pages += self.traversal_tabao_shop(keyword=keyword)
 
         self.close_browser()
         self.logger.info('-' * 100)
