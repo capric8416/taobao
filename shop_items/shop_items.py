@@ -16,6 +16,8 @@ import urllib.parse
 
 import fire
 
+from pyvirtualdisplay import Display
+
 import redis
 
 from selenium import webdriver
@@ -59,16 +61,20 @@ class GetShopItem(object):
 
         self.logger = init_logger(name=self.__class__.__name__, task_id=self.task_id, log_dir=log_dir)
 
+        self.display = Display(visible=0, size=(800, 600))
         self.browser = self.open_browser()
 
     def open_browser(self, default='Chrome'):
         self.logger.info('browser: launching')
 
+        self.display.start()
+
         if default == 'Chrome':
             chrome_options = webdriver.ChromeOptions()
             chrome_options.add_argument('-incognito')
-            chrome_options.add_argument('--headless')
-            chrome_options.add_argument('--disable-gpu')
+            # chrome_options.add_argument('--headless')
+            # chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('window-size=360,640')
             chrome_options.add_experimental_option('prefs', {'profile.managed_default_content_settings.images': 2})
 
@@ -107,6 +113,7 @@ class GetShopItem(object):
         self.browser.close()
         self.browser.service.process.send_signal(signal.SIGTERM)
         self.browser.quit()
+        self.display.stop()
 
     def find_taobao_goods(self, keyword):
         try:
@@ -133,7 +140,7 @@ class GetShopItem(object):
                 }
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.lpush(self.key_item, goods_url)
+                self.redis.sadd(self.key_item, goods_url)
                 self.redis.hset(
                     '{}@{}'.format(self.key_goods, goods_info['modified'].split()[0]),
                     goods_id, json.dumps(obj=goods_info, ensure_ascii=False, sort_keys=True)
@@ -166,7 +173,7 @@ class GetShopItem(object):
                 goods_info['sales_volume'] = re.sub(r'.*?(\d+).*', r'\g<1>', goods_info['sales_volume'])
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.lpush(self.key_item, goods_url)
+                self.redis.sadd(self.key_item, goods_url)
                 self.redis.hset(
                     '{}@{}'.format(self.key_goods, goods_info['modified'].split()[0]),
                     goods_id, json.dumps(obj=goods_info, ensure_ascii=False, sort_keys=True)
@@ -335,7 +342,7 @@ if __name__ == '__main__':
     """
     Usage: shop_items.py MAX_PAGES [ENABLE_PROXY] [REDIS_URL] [LOG_DIR]
            shop_items.py --max-pages MAX_PAGES [--enable-proxy ENABLE_PROXY] [--redis-url REDIS_URL] [--log-dir LOG_DIR]
-    
+
     Example: shop_items.py run --max-pages=25
              screen -dmS get_shop_item shop_items.py run --max-pages=25
     """

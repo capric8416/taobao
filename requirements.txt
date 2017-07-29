@@ -7,3 +7,4 @@ redis
 requests
 pyquery
 selenium
+pyvirtualdisplay
