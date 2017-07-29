@@ -133,7 +133,7 @@ class GetShopItem(object):
                 }
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.sadd(self.key_item, goods_url)
+                self.redis.lpush(self.key_item, goods_url)
                 self.redis.hset(
                     '{}@{}'.format(self.key_goods, goods_info['modified'].split()[0]),
                     goods_id, json.dumps(obj=goods_info, ensure_ascii=False, sort_keys=True)
@@ -166,7 +166,7 @@ class GetShopItem(object):
                 goods_info['sales_volume'] = re.sub(r'.*?(\d+).*', r'\g<1>', goods_info['sales_volume'])
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.sadd(self.key_item, goods_url)
+                self.redis.lpush(self.key_item, goods_url)
                 self.redis.hset(
                     '{}@{}'.format(self.key_goods, goods_info['modified'].split()[0]),
                     goods_id, json.dumps(obj=goods_info, ensure_ascii=False, sort_keys=True)
