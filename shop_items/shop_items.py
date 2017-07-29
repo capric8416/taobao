@@ -285,7 +285,8 @@ class GetShopItem(object):
 
 class TaskDispatcher(object):
     def __init__(
-        self, max_pages, enable_proxy=True, redis_url='redis://localhost:6379/1', log_dir='~/logs/shop_items/'
+        self, max_pages, enable_proxy=True, log_dir='~/data/logs/shop_items/',
+        redis_url=os.environ.get('REDIS_URL') or 'redis://localhost:6379/1'
     ):
         self.max_pages = max_pages
         self.enable_proxy = enable_proxy
