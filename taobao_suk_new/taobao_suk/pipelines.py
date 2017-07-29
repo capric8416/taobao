@@ -20,8 +20,6 @@ class TaobaoSukPipeline(object):
               'shop_info': ('shop_id',),
          }
 
-    unique_index = 'pag_id'
-
     def __init__(self, mongo_uri, mongo_db):
         self.mongo_uri = mongo_uri
         self.mongo_db = mongo_db
@@ -39,9 +37,9 @@ class TaobaoSukPipeline(object):
 
         for k, v in self.collection_name_list.items():
             if len(v) == 1:
-                self.db[k].ensure_index(v[0], unique=True)
-            else:
-                self.db[k].ensure_index('unique_id', unique=True)
+                self.db[k].ensure_index(v[0])
+
+
 
     def process_item(self, item, spider):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id
@@ -49,13 +47,6 @@ class TaobaoSukPipeline(object):
             dict_item = dict(item['detail'])
             # self.db[self.collection_name].insert(dict_item)
             for k, v in dict_item.items():
-                unique_list = self.collection_name_list[k]
-                if len(unique_list) > 1:
-                    md_5 = hashlib.md5()
-                    unique_str = ''.join([v[unique_k] for unique_k in unique_list])
-                    md_5.update(unique_str.encode("utf-8"))
-                    unique_id = md_5.hexdigest()
-                    v['unique_id'] = unique_id
                 self.db[k].insert(v)
 
             spider.logger.debug(dict_item)
