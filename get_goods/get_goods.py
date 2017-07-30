@@ -49,7 +49,7 @@ def init_logger(name, task_id, log_dir):
     return logger
 
 
-class GetShopItem(object):
+class GetGoods(object):
     def __init__(self, task_id, max_pages, proxy, redis_url, mongo_url, log_dir):
         self.task_id = task_id
         self.max_pages = max_pages
@@ -314,7 +314,7 @@ class GetShopItem(object):
 
 class TaskDispatcher(object):
     def __init__(
-        self, max_pages, enable_proxy=True, log_dir='~/data/logs/shop_items/',
+        self, max_pages, enable_proxy=True, log_dir='~/data/logs/get_goods/',
         redis_url=os.environ.get('REDIS_URL') or 'redis://localhost:6379/1',
         mongo_url=os.environ.get('MONGO_URL') or 'mongodb://localhost:27017/'
     ):
@@ -341,11 +341,11 @@ class TaskDispatcher(object):
         return proxy
 
     def task(self, task_id, proxy):
-        get_shop_items = GetShopItem(
+        fecher = GetGoods(
             task_id=task_id, max_pages=self.max_pages, proxy=proxy,
             redis_url=self.redis_url, mongo_url=self.mongo_url, log_dir=self.log_dir
         )
-        get_shop_items.run()
+        fecher.run()
 
     def run(self):
         tasks = {i: None for i in (range(27, 33) if self.enable_proxy else range(27, 28))}
@@ -365,11 +365,11 @@ class TaskDispatcher(object):
 
 if __name__ == '__main__':
     """
-    Usage: shop_items.py MAX_PAGES [ENABLE_PROXY] [REDIS_URL] [LOG_DIR]
-           shop_items.py --max-pages MAX_PAGES [--enable-proxy ENABLE_PROXY] [--redis-url REDIS_URL] [--log-dir LOG_DIR]
+    Usage: get_goods.py MAX_PAGES [ENABLE_PROXY] [REDIS_URL] [LOG_DIR]
+           get_goods.py --max-pages MAX_PAGES [--enable-proxy ENABLE_PROXY] [--redis-url REDIS_URL] [--log-dir LOG_DIR]
 
-    Example: shop_items.py run --max-pages=25
-             screen -dmS get_shop_item shop_items.py run --max-pages=25
+    Example: get_goods.py run --max-pages=25
+             screen -dmS get_shop_item get_goods.py run --max-pages=25
     """
 
     fire.Fire(TaskDispatcher)
