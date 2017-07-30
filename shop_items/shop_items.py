@@ -16,6 +16,7 @@ import urllib.parse
 
 import fire
 
+import pymongo
 from pyvirtualdisplay import Display
 
 import redis
@@ -49,15 +50,21 @@ def init_logger(name, task_id, log_dir):
 
 
 class GetShopItem(object):
-    def __init__(self, task_id, max_pages, proxy, redis_url, log_dir):
+    def __init__(self, task_id, max_pages, proxy, redis_url, mongo_url, log_dir):
         self.task_id = task_id
         self.max_pages = max_pages
         self.proxy = proxy
 
-        self.key_shop = 'shop_urls'
-        self.key_item = 'goods_grab:start_urls'
-        self.key_goods = 'goods'
+        self.key_shop_urls = 'shop_urls'
+        self.key_goods_urls = 'goods_grab:start_urls'
         self.redis = redis.from_url(redis_url)
+
+        self.mongo = pymongo.MongoClient(mongo_url)
+        self.mongo_db = 'test'
+        self.mongo_collection = 'goods_list'
+        self.mongo[self.mongo_db][self.mongo_collection].create_index([
+            ('id', pymongo.ASCENDING), ('date', pymongo.DESCENDING), ('shop_id', pymongo.ASCENDING)
+        ])
 
         self.logger = init_logger(name=self.__class__.__name__, task_id=self.task_id, log_dir=log_dir)
 
@@ -115,8 +122,10 @@ class GetShopItem(object):
         self.browser.quit()
         self.display.stop()
 
-    def find_taobao_goods(self, keyword):
+    def find_taobao_goods(self, keyword, shop_id):
         try:
+            goods_list = []
+
             for a in self.browser.find_elements_by_xpath('//ul[@class="goods-list-items"]//a'):
                 goods_url = a.get_attribute('href')
                 goods_id = urllib.parse.parse_qs(urllib.parse.urlparse(goods_url).query)['id'][0]
@@ -125,13 +134,18 @@ class GetShopItem(object):
                 left = a.find_element_by_xpath('child::div[@class="left"]')
                 right = a.find_element_by_xpath('child::div[@class="right"]')
 
+                now = datetime.now()
+                today = now.today()
+
                 goods_info = {
-                    'id': goods_id,
+                    'id': int(goods_id),
                     'url': goods_url,
                     'from': '淘宝',
+                    'shop_id': int(shop_id),
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
-                    'modified': datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
+                    'date': today.strftime('%Y-%m-%d'),
+                    'modified': now.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
                     'image': left.find_element_by_xpath('child::img').get_attribute('src'),
                     'title': right.find_element_by_xpath('child::h3[@class="d-title"]').text,
                     'price_highlight': right.find_element_by_xpath('child::p[@class="d-price"]/em[@class="h"]').text,
@@ -139,29 +153,36 @@ class GetShopItem(object):
                     'sales_volume': right.find_element_by_xpath('child::p[@class="info"]/span[@class="d-num"]/em').text
                 }
 
+                goods_list.append(goods_info)
+
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.sadd(self.key_item, goods_url)
-                self.redis.hset(
-                    '{}@{}'.format(self.key_goods, goods_info['modified'].split()[0]),
-                    goods_id, json.dumps(obj=goods_info, ensure_ascii=False, sort_keys=True)
-                )
+                self.redis.sadd(self.key_goods_urls, goods_url)
         except Exception as e:
             self.logger.warning(e)
+        else:
+            self.mongo[self.mongo_db][self.mongo_collection].insert_many(goods_list)
 
-    def find_tmall_goods(self, keyword):
+    def find_tmall_goods(self, keyword, shop_id):
         try:
+            goods_list = []
+
             for a in self.browser.find_elements_by_xpath('//div[@class="tile_box"]//a[@class="tile_item"]'):
                 goods_url = a.get_attribute('href')
                 goods_id = urllib.parse.parse_qs(urllib.parse.urlparse(goods_url).query)['id'][0]
                 goods_url = 'https://detail.m.tmall.com/item.htm?id={}'.format(goods_id)
 
+                now = datetime.now()
+                today = now.today()
+
                 goods_info = {
-                    'id': goods_id,
+                    'id': int(goods_id),
                     'url': goods_url,
                     'from': '天猫',
+                    'shop_id': int(shop_id),
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
-                    'modified': datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
+                    'date': today.strftime('%Y-%m-%d'),
+                    'modified': now.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
                     'image': a.find_element_by_xpath('descendant::img[@class="ti_img"]').get_attribute('src'),
                     'title': a.find_element_by_xpath('descendant::div[@class="tii_title"]/h3').text,
                     'price_highlight': a.find_element_by_xpath('descendant::div[@class="tii_price"]').text.split()[0],
@@ -172,16 +193,16 @@ class GetShopItem(object):
                 goods_info['price_highlight'] = re.sub(r'.*?(\d+).*', r'\g<1>', goods_info['price_highlight'])
                 goods_info['sales_volume'] = re.sub(r'.*?(\d+).*', r'\g<1>', goods_info['sales_volume'])
 
+                goods_list.append(goods_info)
+
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.sadd(self.key_item, goods_url)
-                self.redis.hset(
-                    '{}@{}'.format(self.key_goods, goods_info['modified'].split()[0]),
-                    goods_id, json.dumps(obj=goods_info, ensure_ascii=False, sort_keys=True)
-                )
+                self.redis.sadd(self.key_goods_urls, goods_url)
         except Exception as e:
             self.logger.warning(e)
+        else:
+            self.mongo[self.mongo_db][self.mongo_collection].insert_many(goods_list)
 
-    def traversal_tabao_shop(self, keyword):
+    def traversal_tabao_shop(self, keyword, shop_id):
         pages = 0
 
         try:
@@ -191,7 +212,7 @@ class GetShopItem(object):
         except Exception as e:
             _ = e
         else:
-            self.find_taobao_goods(keyword)
+            self.find_taobao_goods(keyword=keyword, shop_id=shop_id)
 
             # 下一页
             xpath = (
@@ -207,11 +228,11 @@ class GetShopItem(object):
                     _ = e
                     break
                 else:
-                    self.find_taobao_goods(keyword)
+                    self.find_taobao_goods(keyword=keyword, shop_id=shop_id)
 
         return pages
 
-    def traversal_tmall_shop(self, p2, keyword):
+    def traversal_tmall_shop(self, p2, keyword, shop_id):
         pages = 0
 
         request_url = f'{p2.scheme}://{p2.hostname}/shop/shop_auction_search.htm?q={keyword}'
@@ -240,7 +261,7 @@ class GetShopItem(object):
                 else:
                     break
 
-            self.find_tmall_goods(keyword)
+            self.find_tmall_goods(keyword=keyword, shop_id=shop_id)
 
         return pages
 
@@ -253,12 +274,13 @@ class GetShopItem(object):
             if pages > 0 and pages % self.max_pages == 0:
                 break
 
-            shop_info = self.redis.spop(self.key_shop)
+            shop_info = self.redis.spop(self.key_shop_urls)
             if not shop_info:
                 break
 
             shop_url, keyword = json.loads(shop_info)
             keyword = urllib.parse.quote(keyword)
+            shop_id = re.sub(r'.*shop(\d+)\.taobao\.com.*', r'\g<1>', shop_url)
             shop_url = re.sub(r'(\d+)\.(taobao\.com)', r'\g<1>.m.\g<2>', shop_url)
 
             request_url = '{}/#list?q={}'.format(shop_url, keyword)
@@ -281,10 +303,10 @@ class GetShopItem(object):
 
             if p1.hostname.endswith('taobao.com') and p2.hostname.endswith('tmall.com'):
                 # 天猫
-                pages += self.traversal_tmall_shop(p2=p2, keyword=keyword)
+                pages += self.traversal_tmall_shop(p2=p2, keyword=keyword, shop_id=shop_id)
             else:
                 # 淘宝
-                pages += self.traversal_tabao_shop(keyword=keyword)
+                pages += self.traversal_tabao_shop(keyword=keyword, shop_id=shop_id)
 
         self.close_browser()
         self.logger.info('-' * 100)
@@ -293,11 +315,13 @@ class GetShopItem(object):
 class TaskDispatcher(object):
     def __init__(
         self, max_pages, enable_proxy=True, log_dir='~/data/logs/shop_items/',
-        redis_url=os.environ.get('REDIS_URL') or 'redis://localhost:6379/1'
+        redis_url=os.environ.get('REDIS_URL') or 'redis://localhost:6379/1',
+        mongo_url=os.environ.get('MONGO_URL') or 'mongodb://localhost:27017/'
     ):
         self.max_pages = max_pages
         self.enable_proxy = enable_proxy
         self.redis_url = redis_url
+        self.mongo_url = mongo_url
         self.log_dir = log_dir
 
         self.proxy_pool = ProxyPool()
@@ -318,7 +342,8 @@ class TaskDispatcher(object):
 
     def task(self, task_id, proxy):
         get_shop_items = GetShopItem(
-            task_id=task_id, max_pages=self.max_pages, proxy=proxy, redis_url=self.redis_url, log_dir=self.log_dir
+            task_id=task_id, max_pages=self.max_pages, proxy=proxy,
+            redis_url=self.redis_url, mongo_url=self.mongo_url, log_dir=self.log_dir
         )
         get_shop_items.run()
 
