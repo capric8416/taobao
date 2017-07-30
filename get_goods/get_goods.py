@@ -156,7 +156,7 @@ class GetGoods(object):
                 goods_list.append(goods_info)
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.sadd(self.key_goods_urls, goods_url)
+                self.redis.lpush(self.key_goods_urls, goods_url)
         except Exception as e:
             self.logger.warning(e)
         else:
@@ -196,7 +196,7 @@ class GetGoods(object):
                 goods_list.append(goods_info)
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.sadd(self.key_goods_urls, goods_url)
+                self.redis.lpush(self.key_goods_urls, goods_url)
         except Exception as e:
             self.logger.warning(e)
         else:
