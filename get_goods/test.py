@@ -4,6 +4,7 @@
 import json
 import multiprocessing
 import random
+import signal
 import time
 
 import redis
@@ -64,8 +65,21 @@ def export_goods():
         json.dump(obj=items, fp=fp, ensure_ascii=False)
 
 
+class GracefullyExit(object):
+    received = False
+
+    def __init__(self):
+        for _signal in (signal.SIGINT, signal.SIGTERM):
+            signal.signal(_signal, self.exit_gracefully)
+
+    def exit_gracefully(self, signum, frame):
+        self.received = True
+
 
 class Test(object):
+    def __init__(self):
+        self.gracefully_exit = GracefullyExit()
+
     def f(self, name):
         print('start', name)
 
@@ -85,13 +99,19 @@ class Test(object):
                     p.start()
                     container[k] = p
 
+            if self.gracefully_exit.received:
+                for k in container:
+                    if container[k].is_alive():
+                        container[k].terminate()
+                break
+
             time.sleep(0.1)
 
 
 if __name__ == '__main__':
     # import_shops()
     # export_items()
-    export_goods()
+    # export_goods()
 
-    # t = Test()
-    # t.t()
+    t = Test()
+    t.t()

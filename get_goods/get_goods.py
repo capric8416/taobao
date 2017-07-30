@@ -49,6 +49,19 @@ def init_logger(name, task_id, log_dir):
     return logger
 
 
+class GracefullyExit(object):
+    received = False
+
+    def __init__(self):
+        for _signal in (signal.SIGINT, signal.SIGTERM):
+            signal.signal(_signal, self.exit_gracefully)
+
+    def exit_gracefully(self, signum, frame):
+        _ = signum
+        _ = frame
+        self.received = True
+
+
 class GetGoods(object):
     def __init__(self, task_id, max_pages, proxy, redis_url, mongo_url, log_dir):
         self.task_id = task_id
@@ -329,6 +342,8 @@ class TaskDispatcher(object):
 
         self.logger = init_logger(name=self.__class__.__name__, task_id=0, log_dir=log_dir)
 
+        self.gracefully_exit = GracefullyExit()
+
     def reset_proxy(self, proxy_id):
         self.logger.info('proxy.{}: launching'.format(proxy_id))
 
@@ -359,6 +374,12 @@ class TaskDispatcher(object):
                     process.start()
 
                     tasks[task_id] = process
+
+            if self.gracefully_exit.received:
+                for task_id in tasks:
+                    if tasks[task_id].is_alive():
+                        tasks[task_id].terminate()
+                break
 
             time.sleep(0.1)
 
