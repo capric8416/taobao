@@ -39,7 +39,7 @@ class TaobaoSukPipeline(object):
 
         for k, v in self.collection_name_list.items():
             if len(v) == 1:
-                self.db[k].ensure_index(v[0], unique=True)
+                self.db[k].ensure_index(v[0])
 
     def process_item(self, item, spider):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id
