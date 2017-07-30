@@ -1,0 +1,3 @@
+#!/bin/bash
+
+supervisorctl start goods_list
