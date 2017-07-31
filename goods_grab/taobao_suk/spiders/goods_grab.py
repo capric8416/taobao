@@ -108,7 +108,7 @@ class GoodsGrab(RedisSpider):
 
         base_info = response.meta['data']
         base_info.update(item)
-
+        base_info['shop_type'] = '淘宝'
         base_info['goods_id'] = re.search(r'itemId=(\d*)', response.url).group(1)
         base_info['modified'] = datetime.now()
 
@@ -151,4 +151,5 @@ class GoodsGrab(RedisSpider):
         json_text = re.search(r'var _DATA_Mdskip =\s({.*?})\s</script>', text).group(1)
         item['price'] = json.loads(json_text).get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
         item['modified'] = datetime.now()
+        item['shop_type'] = '天猫'
         return item
