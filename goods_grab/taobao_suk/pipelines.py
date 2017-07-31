@@ -16,8 +16,8 @@ class TaobaoSukPipeline(object):
     collection_name = 'taobao_info'
     collection_name_list = \
         {
-              'goods_info': ('goods_id',),
-              'shop_info': ('shop_id',),
+              'goods_info': ('goods_id', 'modified'),
+              'shop_info': ('shop_id', 'date'),
          }
 
     unique_index = 'pag_id'
@@ -38,9 +38,8 @@ class TaobaoSukPipeline(object):
         self.db = self.client[self.mongo_db]
 
         for k, v in self.collection_name_list.items():
-            if len(v) == 1:
-                self.db[k].ensure_index(v[0])
-
+            for v_items in v:
+                self.db[k].ensure_index(v_items)
     def process_item(self, item, spider):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id
         try:
