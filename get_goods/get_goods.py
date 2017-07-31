@@ -70,6 +70,7 @@ class GetGoods(object):
 
         self.key_shop_urls = 'shop_urls'
         self.key_goods_urls = 'goods_grab:start_urls'
+        self.key_task_running = 'running_task_goods_list'
         self.redis = redis.from_url(redis_url)
 
         self.mongo = pymongo.MongoClient(mongo_url)
@@ -158,7 +159,7 @@ class GetGoods(object):
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
                     'date': today.strftime('%Y-%m-%d'),
-                    'modified': now.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
+                    'modified': now,
                     'image': left.find_element_by_xpath('child::img').get_attribute('src'),
                     'title': right.find_element_by_xpath('child::h3[@class="d-title"]').text,
                     'price_highlight': right.find_element_by_xpath('child::p[@class="d-price"]/em[@class="h"]').text,
@@ -171,7 +172,7 @@ class GetGoods(object):
                 self.logger.info('goods: {}'.format(goods_info))
                 self.redis.lpush(self.key_goods_urls, goods_url)
         except Exception as e:
-            self.logger.warning(e)
+            self.logger.error(e)
         else:
             self.mongo[self.mongo_db][self.mongo_collection].insert_many(goods_list)
 
@@ -195,7 +196,7 @@ class GetGoods(object):
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
                     'date': today.strftime('%Y-%m-%d'),
-                    'modified': now.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],
+                    'modified': now,
                     'image': a.find_element_by_xpath('descendant::img[@class="ti_img"]').get_attribute('src'),
                     'title': a.find_element_by_xpath('descendant::div[@class="tii_title"]/h3').text,
                     'price_highlight': a.find_element_by_xpath('descendant::div[@class="tii_price"]').text.split()[0],
@@ -211,7 +212,7 @@ class GetGoods(object):
                 self.logger.info('goods: {}'.format(goods_info))
                 self.redis.lpush(self.key_goods_urls, goods_url)
         except Exception as e:
-            self.logger.warning(e)
+            self.logger.error(e)
         else:
             self.mongo[self.mongo_db][self.mongo_collection].insert_many(goods_list)
 
@@ -283,12 +284,20 @@ class GetGoods(object):
 
         pages = 0
 
+        self.redis.hsetnx(self.key_task_running, 'start', datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))
+
         while True:
             if pages > 0 and pages % self.max_pages == 0:
                 break
 
             shop_info = self.redis.spop(self.key_shop_urls)
             if not shop_info:
+                self.redis.hset(self.key_task_running, 'end', datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))
+                self.logger.info('{0} {1} -> {2} {0}'.format(
+                    '=' * 40, (self.redis.hget(self.key_task_running, 'start') or b'').decode(),
+                    (self.redis.hget(self.key_task_running, 'end') or b'').decode()
+                ))
+                self.redis.delete(self.key_task_running)
                 break
 
             shop_url, keyword = json.loads(shop_info)
