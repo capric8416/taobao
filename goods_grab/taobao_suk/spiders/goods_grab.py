@@ -73,7 +73,6 @@ class GoodsGrab(RedisSpider):
         result = {}
         for key in xpath_item:
             result[key] = ''.join(tree.xpath(xpath_item[key])).strip()
-        print(result)
 
 
         url = "https://detailskip.taobao.com/service/getData/1/p1/item/detail/sib.htm?itemId={}&modules=dynStock," \
@@ -111,7 +110,7 @@ class GoodsGrab(RedisSpider):
         base_info.update(item)
 
         base_info['goods_id'] = re.search(r'itemId=(\d*)', response.url).group(1)
-        base_info['modified'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+        base_info['modified'] = datetime.now()
 
         yield items.TaobaoSukItem(detail={'goods_info': base_info})
 
@@ -151,5 +150,5 @@ class GoodsGrab(RedisSpider):
         item['goods_id'] = re.search(r'id=(\d*)', response.url).group(1)
         json_text = re.search(r'var _DATA_Mdskip =\s({.*?})\s</script>', text).group(1)
         item['price'] = json.loads(json_text).get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
-        item['modified'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
+        item['modified'] = datetime.now()
         return item

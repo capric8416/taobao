@@ -38,6 +38,7 @@ class ProxySwift(object):
         md_5.update(data.encode("utf-8"))
         sign = md_5.hexdigest()
         source_data.update({'sign': sign})
+        requests.packages.urllib3.disable_warnings()
         return requests.get(url, params=source_data, verify=False, *p, **kwargs)
 
     def get_ip(self, interface_id='', pool_id='2'):
@@ -102,7 +103,14 @@ class ProxyPool(object):
                 time.sleep(1)
                 break
 
+def refresh():
+    s = ProxySwift()
+    ip_info_list = s.get_ip()
 
+    for ip_list in ip_info_list:
+        s.changes_ip(ip_list['id'])
+
+refresh()
 if __name__ == '__main__':
     # p = ProxyPool()
     #
