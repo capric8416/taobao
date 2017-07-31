@@ -6,7 +6,6 @@ import re
 import os
 import redis
 from datetime import datetime
-import lxml
 import json
 from taobao_suk import items
 
@@ -16,13 +15,16 @@ class TaobaoSpider(scrapy.Spider):
     allowed_domains = ["taobao.com", "tmall.hk", "tmall.com"]
     start_urls = ['http://taobao.com/']
 
-    redis_url = os.environ.get('REDIS_URL')
+    redis_url = os.environ.get('REDIS_URL', None) or 'redis://10.0.54.45:6378'
     pool = redis.ConnectionPool.from_url(redis_url)
     rds = redis.StrictRedis(connection_pool=pool)
 
     def start_requests(self):
 
-        # 重跑所有链接
+        # check grab_goods_over
+        flag = self.rds.exists('running_task_goods_list')
+        if flag:
+            return
 
         base_url = 'https://shopsearch.taobao.com/search?app=shopsearch&q={}'
         # world_list = ['papa recipe']
@@ -33,13 +35,14 @@ class TaobaoSpider(scrapy.Spider):
 
         addrs_url = '&loc={}'
         # addrs_list =['']
-        addrs_list = ["北京", "上海", "广州", "深圳", "杭州", "海外", "江浙沪", "珠三角", "京津冀", "东三省", "港澳台",
-        "江浙沪皖", "长沙", "长春", "成都", "重庆", "大连", "东莞", "佛山", "福州", "贵阳", "合肥",
-        "金华", "济南", "嘉兴", "昆明", "宁波", "南昌", "南京", "青岛", "泉州", "沈阳", "苏州", "天津",
-        "温州", "无锡", "武汉", "西安", "厦门", "郑州", "中山", "石家庄", "哈尔滨", "安徽", "福建",
-        "甘肃", "广东", "广西", "贵州", "海南", "河北", "河南", "湖北", "湖南", "江苏", "江西", "吉林",
-        "辽宁", "宁夏", "青海", "山东", "山西", "陕西", "云南", "四川", "西藏", "新疆", "浙江", "澳门",
-        "香港", "台湾", "内蒙古", "黑龙江", ""]
+        addrs_list = \
+            ["北京", "上海", "广州", "深圳", "杭州", "海外", "江浙沪", "珠三角", "京津冀", "东三省", "港澳台",
+                "江浙沪皖", "长沙", "长春", "成都", "重庆", "大连", "东莞", "佛山", "福州", "贵阳", "合肥",
+                "金华", "济南", "嘉兴", "昆明", "宁波", "南昌", "南京", "青岛", "泉州", "沈阳", "苏州", "天津",
+                "温州", "无锡", "武汉", "西安", "厦门", "郑州", "中山", "石家庄", "哈尔滨", "安徽", "福建",
+                "甘肃", "广东", "广西", "贵州", "海南", "河北", "河南", "湖北", "湖南", "江苏", "江西", "吉林",
+                "辽宁", "宁夏", "青海", "山东", "山西", "陕西", "云南", "四川", "西藏", "新疆", "浙江", "澳门",
+                "香港", "台湾", "内蒙古", "黑龙江", ""]
 
         shop_type_url = '&isb={}'
         shop_type = ['0']
@@ -82,7 +85,8 @@ class TaobaoSpider(scrapy.Spider):
             shop_info['shop_deng_ji'] = item['shopIcon']['iconClass']
             shop_info['shop_type'] = '天猫' if response.meta['shop_type'] else '淘宝'
             shop_info['url'] = 'https:{}'.format(item['shopUrl'])
-            shop_info['modified'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            shop_info['modified'] = datetime.now()
+            shop_info['date'] = datetime.now().strftime('%Y-%m-%d')
 
             self.rds.sadd('shop_urls', json.dumps(('https:{}'.format(item['shopUrl']), response.meta['word'])))
             yield items.TaobaoSukItem(detail={'shop_info': shop_info})

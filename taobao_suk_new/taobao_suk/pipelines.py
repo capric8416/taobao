@@ -17,7 +17,7 @@ class TaobaoSukPipeline(object):
     collection_name_list = \
         {
               'base_info': ('goods_id',),
-              'shop_info': ('shop_id',),
+              'shop_info': ('shop_id', 'date'),
          }
 
     def __init__(self, mongo_uri, mongo_db):
@@ -36,8 +36,8 @@ class TaobaoSukPipeline(object):
         self.db = self.client[self.mongo_db]
 
         for k, v in self.collection_name_list.items():
-            if len(v) == 1:
-                self.db[k].ensure_index(v[0])
+            for v_items in v:
+                self.db[k].ensure_index(v_items)
 
 
 

@@ -9,9 +9,9 @@ import random
 class ProxySwift(object):
 
     def requerst_get(self, url, data, *p, **kwargs):
-        SecretKey = '3JCx8fAF7Bpq5Aj4t9wS7cfVB7hpXZ7j'
+        SecretKey = 'Kg6t55fc39FQRJuh92BwZBMXyK3sWFkJ'
 
-        PartnerID = '2017061217350058'
+        PartnerID = '2017072514450843'
         TimeStamp = int(time.time())
 
         source_data = {
@@ -37,12 +37,13 @@ class ProxySwift(object):
         md_5.update(data.encode("utf-8"))
         sign = md_5.hexdigest()
         source_data.update({'sign': sign})
+        requests.packages.urllib3.disable_warnings()
         return requests.get(url, params=source_data, verify=False, *p, **kwargs)
 
-    def get_ip(self, interface_id='', pool_id='2'):
+    def get_ip(self, interface_id='', pool_id='1'):
         url = 'https://api.proxyswift.com/ip/get'
         data = {
-            'server_id': '1',
+            'server_id': '2',
             'pool_id': pool_id,
             'interface_id': interface_id,
         }
@@ -60,7 +61,7 @@ class ProxySwift(object):
     def changes_ip(self, interface_id, filter=24):
         url = 'https://api.proxyswift.com/ip/change'
         data = {
-            'server_id': '1',
+            'server_id': '2',
             'interface_id': interface_id,
             'filter': filter,
         }
@@ -89,8 +90,9 @@ class ProxyPool(object):
         self.pool = self.ps.get_ip()
 
     def get(self):
-        #从 pool中随机取一个ip
-        ip = "{0}:10000".format(random.choice(self.pool)['ip'])
+        # 从 pool中随机取一个ip
+        ip_port = random.choice(self.pool)
+        ip = "{0}:{1}".format(ip_port['ip'], ip_port['port'])
         return ip
 
     def change_ip(self, proxy_server):
@@ -103,9 +105,14 @@ class ProxyPool(object):
                 break
 
 
-if __name__ == '__main__':
+def refresh():
     s = ProxySwift()
+    ip_info_list = s.get_ip()
 
-    s.changes_ip(12)
+    for ip_list in ip_info_list:
+        s.changes_ip(ip_list['id'])
 
-    print(s.get_ip())
+refresh()
+if __name__ == '__main__':
+    refresh()
+

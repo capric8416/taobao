@@ -14,7 +14,7 @@ BOT_NAME = 'taobao_suk'
 SPIDER_MODULES = ['taobao_suk.spiders']
 NEWSPIDER_MODULE = 'taobao_suk.spiders'
 
-
+LOG_LEVEL = 'INFO'
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'taobao_suk (+http://www.yourdomain.com)'
 
