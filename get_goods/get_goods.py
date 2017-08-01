@@ -28,6 +28,17 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
 
+REDIS_KEY_SHOP_URLS = 'shop_urls'
+REDIS_KEY_GOODS_URLS = 'goods_grab:start_urls'
+REDIS_KEY_TASK_RUNNING = 'running_task_goods_list'
+
+MONGO_DB_NAME = 'test'
+MONGO_COLLECTION_NAME = 'goods_list'
+
+DATE_FORMAT = '%Y-%m-%d'
+DATE_TIME_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
+
+
 def init_logger(name, task_id, log_dir):
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
@@ -68,15 +79,10 @@ class GetGoods(object):
         self.max_pages = max_pages
         self.proxy = proxy
 
-        self.key_shop_urls = 'shop_urls'
-        self.key_goods_urls = 'goods_grab:start_urls'
-        self.key_task_running = 'running_task_goods_list'
         self.redis = redis.from_url(redis_url)
 
         self.mongo = pymongo.MongoClient(mongo_url)
-        self.mongo_db = 'test'
-        self.mongo_collection = 'goods_list'
-        self.mongo[self.mongo_db][self.mongo_collection].create_index([
+        self.mongo[MONGO_DB_NAME][MONGO_COLLECTION_NAME].create_index([
             ('id', pymongo.ASCENDING), ('date', pymongo.DESCENDING), ('shop_id', pymongo.ASCENDING)
         ])
 
@@ -158,7 +164,7 @@ class GetGoods(object):
                     'shop_id': int(shop_id),
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
-                    'date': today.strftime('%Y-%m-%d'),
+                    'date': today.strftime(DATE_FORMAT),
                     'modified': now,
                     'image': left.find_element_by_xpath('child::img').get_attribute('src'),
                     'title': right.find_element_by_xpath('child::h3[@class="d-title"]').text,
@@ -170,11 +176,11 @@ class GetGoods(object):
                 goods_list.append(goods_info)
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.lpush(self.key_goods_urls, goods_url)
+                self.redis.lpush(REDIS_KEY_GOODS_URLS, goods_url)
         except Exception as e:
             self.logger.error(e)
         else:
-            self.mongo[self.mongo_db][self.mongo_collection].insert_many(goods_list)
+            self.mongo[MONGO_DB_NAME][MONGO_COLLECTION_NAME].insert_many(goods_list)
 
     def find_tmall_goods(self, keyword, shop_id):
         try:
@@ -195,7 +201,7 @@ class GetGoods(object):
                     'shop_id': int(shop_id),
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
-                    'date': today.strftime('%Y-%m-%d'),
+                    'date': today.strftime(DATE_FORMAT),
                     'modified': now,
                     'image': a.find_element_by_xpath('descendant::img[@class="ti_img"]').get_attribute('src'),
                     'title': a.find_element_by_xpath('descendant::div[@class="tii_title"]/h3').text,
@@ -210,11 +216,11 @@ class GetGoods(object):
                 goods_list.append(goods_info)
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.lpush(self.key_goods_urls, goods_url)
+                self.redis.lpush(REDIS_KEY_GOODS_URLS, goods_url)
         except Exception as e:
             self.logger.error(e)
         else:
-            self.mongo[self.mongo_db][self.mongo_collection].insert_many(goods_list)
+            self.mongo[MONGO_DB_NAME][MONGO_COLLECTION_NAME].insert_many(goods_list)
 
     def traversal_tabao_shop(self, keyword, shop_id):
         pages = 0
@@ -284,20 +290,21 @@ class GetGoods(object):
 
         pages = 0
 
-        self.redis.hsetnx(self.key_task_running, 'start', datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))
+        if self.redis.exists(REDIS_KEY_SHOP_URLS):
+            self.redis.hsetnx(REDIS_KEY_TASK_RUNNING, 'start', datetime.now().strftime(DATE_TIME_FORMAT))
 
         while True:
             if pages > 0 and pages % self.max_pages == 0:
                 break
 
-            shop_info = self.redis.spop(self.key_shop_urls)
+            shop_info = self.redis.spop(REDIS_KEY_SHOP_URLS)
             if not shop_info:
-                self.redis.hset(self.key_task_running, 'end', datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))
+                self.redis.hset(REDIS_KEY_TASK_RUNNING, 'end', datetime.now().strftime(DATE_TIME_FORMAT))
                 self.logger.info('{0} {1} -> {2} {0}'.format(
-                    '=' * 40, (self.redis.hget(self.key_task_running, 'start') or b'').decode(),
-                    (self.redis.hget(self.key_task_running, 'end') or b'').decode()
+                    '=' * 40, (self.redis.hget(REDIS_KEY_TASK_RUNNING, 'start') or b'').decode(),
+                    (self.redis.hget(REDIS_KEY_TASK_RUNNING, 'end') or b'').decode()
                 ))
-                self.redis.delete(self.key_task_running)
+                self.redis.delete(REDIS_KEY_TASK_RUNNING)
                 break
 
             shop_url, keyword = json.loads(shop_info)
@@ -353,6 +360,8 @@ class TaskDispatcher(object):
 
         self.gracefully_exit = GracefullyExit()
 
+        self.redis = redis.from_url(redis_url)
+
     def reset_proxy(self, proxy_id):
         self.logger.info('proxy.{}: launching'.format(proxy_id))
 
@@ -390,6 +399,9 @@ class TaskDispatcher(object):
                         tasks[task_id].terminate()
                 break
 
+            if not self.redis.exists(REDIS_KEY_TASK_RUNNING):
+                break
+
             time.sleep(0.1)
 
 
@@ -399,7 +411,7 @@ if __name__ == '__main__':
            get_goods.py --max-pages MAX_PAGES [--enable-proxy ENABLE_PROXY] [--redis-url REDIS_URL] [--log-dir LOG_DIR]
 
     Example: get_goods.py run --max-pages=25
-             screen -dmS get_shop_item get_goods.py run --max-pages=25
+             screen -dmS get_goods get_goods.py run --max-pages=25
     """
 
     fire.Fire(TaskDispatcher)
