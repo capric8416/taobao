@@ -17,7 +17,7 @@ class TaobaoSukPipeline(object):
     collection_name_list = \
         {
               'goods_info': ('goods_id', 'modified'),
-              'shop_info': ('shop_id', 'date'),
+              'shop_info': ('date',),
          }
 
     unique_index = 'pag_id'

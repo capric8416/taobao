@@ -86,6 +86,7 @@ class TaobaoSpider(scrapy.Spider):
             shop_info['shop_type'] = '天猫' if response.meta['shop_type'] else '淘宝'
             shop_info['url'] = 'https:{}'.format(item['shopUrl'])
             shop_info['modified'] = datetime.now()
+            shop_info['keyword'] = response.meta['word']
             shop_info['date'] = datetime.now().strftime('%Y-%m-%d')
 
             self.rds.sadd('shop_urls', json.dumps(('https:{}'.format(item['shopUrl']), response.meta['word'])))
