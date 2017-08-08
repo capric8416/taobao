@@ -57,16 +57,20 @@ class GoodsGrab(RedisSpider):
 
             'market_time': '//ul[@class="attributes-list"]//li[contains(text(),"上市时间")]/@title',  # i上市时间
             'category': '//ul[@class="attributes-list"]//li[contains(text(),"面膜分类")]/@title',  # 面膜分类
-            'suitable_skin  ': '//ul[@class="attributes-list"]//li[contains(text(),"适合肤质")]/@title',  # 适合肤质
+            'suitable_skin': '//ul[@class="attributes-list"]//li[contains(text(),"适合肤质")]/@title',  # 适合肤质
             'effect': '//ul[@class="attributes-list"]//li[contains(text(),"功效")]/@title',  # 功效
-            'shelf_life ': '//ul[@class="attributes-list"]//li[contains(text(),"保质期")]/@title',  # 保质期
+            'shelf_life': '//ul[@class="attributes-list"]//li[contains(text(),"保质期")]/@title',  # 保质期
 
-            'goods_name ': '//ul[@class="attributes-list"]//li[contains(text(),"品名")]/@title',  # 品名
-            'brand ': '//ul[@class="attributes-list"]//li[contains(text(),"品牌")]/@title',  # 品牌
-            'origin_place ': '//ul[@class="attributes-list"]//li[contains(text(),"产地")]/@title',  # 产地
-            'color_type ': '//ul[@class="attributes-list"]//li[contains(text(),"颜色分类")]/@title',  # 颜色分类
-            'rule_type ': '//ul[@class="attributes-list"]//li[contains(text(),"规格类型")]/@title',  # 规格类型
-            'month ': '//ul[@class="attributes-list"]//li[contains(text(),"月份")]/@title'  # 月份
+            'goods_name': '//ul[@class="attributes-list"]//li[contains(text(),"品名")]/@title',  # 品名
+            'brand': '//ul[@class="attributes-list"]//li[contains(text(),"品牌")]/@title',  # 品牌
+            'origin_place': '//ul[@class="attributes-list"]//li[contains(text(),"产地")]/@title',  # 产地
+            'color_type': '//ul[@class="attributes-list"]//li[contains(text(),"颜色分类")]/@title',  # 颜色分类
+            'rule_type': '//ul[@class="attributes-list"]//li[contains(text(),"规格类型")]/@title',  # 规格类型
+            'month': '//ul[@class="attributes-list"]//li[contains(text(),"月份")]/@title'  # 月份
+            'is_special': '//ul[@class="attributes-list"]//li[contains(text(),"是否为特殊用途化妆品")]/@title'
+            'use_date_range': '//ul[@class="attributes-list"]//li[contains(text(),"限期使用日期范围")]/@title'
+            'net_content': '//ul[@class="attributes-list"]//li[contains(text(),"化妆品净含量")]/@title'
+            'single_product': '//ul[@class="attributes-list"]//li[contains(text(),"面膜单品")]/@title'
 
         }
         tree = lxml.etree.HTML(response.text)
@@ -102,14 +106,14 @@ class GoodsGrab(RedisSpider):
         price = item['price'].split('-')
         if len(price) >= 2:
             # 30天销售额
-            item['month_sales'] = str(item['sell_count'] * float(price[0]) * 30) + '-' + str(item['sell_count'] * float(price[-1]) * 30)
+            item['month_sales'] = str(item['sell_count'] * float(price[0])) + '-' + str(item['sell_count'] * float(price[-1]))
         else:
-            item['month_sales'] = item['sell_count'] * float(price[0]) * 30
+            item['month_sales'] = item['sell_count'] * float(price[0])
 
         base_info = response.meta['data']
         base_info.update(item)
         base_info['shop_type'] = '淘宝'
-        base_info['goods_id'] = re.search(r'itemId=(\d*)', response.url).group(1)
+        # base_info['goods_id'] = re.search(r'itemId=(\d*)', response.url).group(1)
         base_info['modified'] = datetime.now()
 
         yield items.TaobaoSukItem(detail={'goods_info': base_info})
@@ -150,6 +154,12 @@ class GoodsGrab(RedisSpider):
         item['goods_id'] = re.search(r'id=(\d*)', response.url).group(1)
         json_text = re.search(r'var _DATA_Mdskip =\s({.*?})\s</script>', text).group(1)
         item['price'] = json.loads(json_text).get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
-        item['modified'] = datetime.now()
+        price = item['price'].split('-')
+        if len(price) >= 2:
+            # 30天销售额
+            item['month_sales'] = str(item['sell_count'] * float(price[0])) + '-' + str(item['sell_count'] * float(price[-1]))
+        else:
+            item['month_sales'] = item['sell_count'] * float(price[0])
         item['shop_type'] = '天猫'
+        item['modified'] = datetime.now()
         return item
