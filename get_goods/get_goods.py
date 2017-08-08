@@ -159,6 +159,7 @@ class GetGoods(object):
                 price_highlight = right.find_element_by_xpath(
                     'child::p[@class="d-price"]/em[@class="h"]').text.strip('￥')
                 price_del = right.find_element_by_xpath('child::p[@class="d-price"]/del').text.strip('￥')
+                sales_volume = right.find_element_by_xpath('child::p[@class="info"]/span[@class="d-num"]/em').text
 
                 goods_info = {
                     'id': int(goods_id),
@@ -167,13 +168,13 @@ class GetGoods(object):
                     'shop_id': int(shop_id),
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
-                    'date': today,
+                    'date': datetime.fromordinal(today.toordinal()),
                     'modified': now,
                     'image': left.find_element_by_xpath('child::img').get_attribute('src'),
                     'title': right.find_element_by_xpath('child::h3[@class="d-title"]').text,
                     'price_highlight': float(price_highlight),
                     'price_del': float(price_del) if price_del else None,
-                    'sales_volume': right.find_element_by_xpath('child::p[@class="info"]/span[@class="d-num"]/em').text
+                    'sales_volume': int(sales_volume)
                 }
 
                 goods_list.append(goods_info)
@@ -207,7 +208,7 @@ class GetGoods(object):
                     'shop_id': int(shop_id),
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
-                    'date': today,
+                    'date': datetime.fromordinal(today.toordinal()),
                     'modified': now,
                     'image': a.find_element_by_xpath('descendant::img[@class="ti_img"]').get_attribute('src'),
                     'title': a.find_element_by_xpath('descendant::div[@class="tii_title"]/h3').text,
@@ -370,9 +371,7 @@ class TaskDispatcher(object):
     def reset_proxy(self, proxy_id):
         self.logger.info('proxy.{}: launching'.format(proxy_id))
 
-        self.proxy_swift.change_ip(proxy_id)
-
-        proxy = 'http://{ip}:{port}'.format(**self.proxy_swift.get_ip(proxy_id)[0])
+        proxy = 'http://{ip}:{port}'.format(**self.proxy_swift.change_ip(proxy_id))
         self.logger.info('proxy.{}: {}'.format(proxy_id, proxy))
 
         return proxy
