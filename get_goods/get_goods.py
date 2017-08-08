@@ -176,7 +176,7 @@ class GetGoods(object):
                 goods_list.append(goods_info)
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.lpush(REDIS_KEY_GOODS_URLS, goods_url)
+                self.redis.sadd(REDIS_KEY_GOODS_URLS, goods_url)
         except Exception as e:
             self.logger.error(e)
         else:
@@ -216,7 +216,7 @@ class GetGoods(object):
                 goods_list.append(goods_info)
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.lpush(REDIS_KEY_GOODS_URLS, goods_url)
+                self.redis.sadd(REDIS_KEY_GOODS_URLS, goods_url)
         except Exception as e:
             self.logger.error(e)
         else:
@@ -353,7 +353,6 @@ class TaskDispatcher(object):
         self.mongo_url = mongo_url
         self.log_dir = log_dir
 
-        self.proxy_pool = ProxyPool()
         self.proxy_swift = ProxySwift()
 
         self.logger = init_logger(name=self.__class__.__name__, task_id=0, log_dir=log_dir)
@@ -365,8 +364,7 @@ class TaskDispatcher(object):
     def reset_proxy(self, proxy_id):
         self.logger.info('proxy.{}: launching'.format(proxy_id))
 
-        self.proxy_pool.change_ip('http://115.237.237.167:10003')
-        self.proxy_swift.changes_ip(proxy_id)
+        self.proxy_swift.change_ip(proxy_id)
 
         proxy = 'http://{ip}:{port}'.format(**self.proxy_swift.get_ip(proxy_id)[0])
         self.logger.info('proxy.{}: {}'.format(proxy_id, proxy))
@@ -381,7 +379,7 @@ class TaskDispatcher(object):
         fecher.run()
 
     def run(self):
-        tasks = {i: None for i in (range(27, 33) if self.enable_proxy else range(27, 28))}
+        tasks = {i: None for i in (range(23, 57) if self.enable_proxy else range(23, 24))}
 
         while True:
             for task_id in tasks:

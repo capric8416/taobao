@@ -1,0 +1,3 @@
+supervisorctl stop all
+stop_goods_list
+start_goods_list
