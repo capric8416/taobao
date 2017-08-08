@@ -35,7 +35,6 @@ REDIS_KEY_TASK_RUNNING = 'running_task_goods_list'
 MONGO_DB_NAME = 'test'
 MONGO_COLLECTION_NAME = 'goods_list'
 
-DATE_FORMAT = '%Y-%m-%d'
 DATE_TIME_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
 
@@ -157,6 +156,10 @@ class GetGoods(object):
                 now = datetime.now()
                 today = now.today()
 
+                price_highlight = right.find_element_by_xpath(
+                    'child::p[@class="d-price"]/em[@class="h"]').text.strip('￥')
+                price_del = right.find_element_by_xpath('child::p[@class="d-price"]/del').text.strip('￥')
+
                 goods_info = {
                     'id': int(goods_id),
                     'url': goods_url,
@@ -164,12 +167,12 @@ class GetGoods(object):
                     'shop_id': int(shop_id),
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
-                    'date': today.strftime(DATE_FORMAT),
+                    'date': today,
                     'modified': now,
                     'image': left.find_element_by_xpath('child::img').get_attribute('src'),
                     'title': right.find_element_by_xpath('child::h3[@class="d-title"]').text,
-                    'price_highlight': right.find_element_by_xpath('child::p[@class="d-price"]/em[@class="h"]').text,
-                    'price_del': right.find_element_by_xpath('child::p[@class="d-price"]/del').text,
+                    'price_highlight': float(price_highlight),
+                    'price_del': float(price_del) if price_del else None,
                     'sales_volume': right.find_element_by_xpath('child::p[@class="info"]/span[@class="d-num"]/em').text
                 }
 
@@ -194,6 +197,9 @@ class GetGoods(object):
                 now = datetime.now()
                 today = now.today()
 
+                price_highlight = a.find_element_by_xpath(
+                    'descendant::div[@class="tii_price"]').text.split()[0].text.strip('￥')
+
                 goods_info = {
                     'id': int(goods_id),
                     'url': goods_url,
@@ -201,12 +207,12 @@ class GetGoods(object):
                     'shop_id': int(shop_id),
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
-                    'date': today.strftime(DATE_FORMAT),
+                    'date': today,
                     'modified': now,
                     'image': a.find_element_by_xpath('descendant::img[@class="ti_img"]').get_attribute('src'),
                     'title': a.find_element_by_xpath('descendant::div[@class="tii_title"]/h3').text,
-                    'price_highlight': a.find_element_by_xpath('descendant::div[@class="tii_price"]').text.split()[0],
-                    'price_del': '',
+                    'price_highlight': float(price_highlight),
+                    'price_del': None,
                     'sales_volume': a.find_element_by_xpath(
                         'descendant::div[@class="tii_price"]/span[@class="tii_sold"]').text
                 }
