@@ -6,6 +6,10 @@
 # 第6列要运行的命令
 
 # shop_list spider
-30 23 * * * * * * /usr/bin/task_shop_list
-0 0 * * * * * * /usr/bin/task_goods_list
-0 8 * * * * * * /usr/bin/task_goods_detail
+0 23 * * * /usr/bin/task_shop_list
+
+# goods_list spider
+0 0 * * * /usr/bin/task_goods_list
+
+# goods_detail spider
+0 8 * * * /usr/bin/task_goods_detail
