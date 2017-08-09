@@ -27,20 +27,20 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
-
 REDIS_KEY_SHOP_URLS = 'shop_urls'
 REDIS_KEY_GOODS_URLS = 'goods_grab:start_urls'
 REDIS_KEY_TASK_RUNNING = 'running_task_goods_list'
 
 MONGO_DB_NAME = 'test'
 MONGO_COLLECTION_NAME = 'goods_list'
+MONGO_LOG_NAME = 'goods_list_logs'
 
 DATE_TIME_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
 
 def init_logger(name, task_id, log_dir):
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    _logger = logging.getLogger(name)
+    _logger.setLevel(logging.INFO)
 
     log_dir = os.path.expanduser(log_dir)
     if not os.path.exists(log_dir) or not os.path.isdir(log_dir):
@@ -54,9 +54,9 @@ def init_logger(name, task_id, log_dir):
         logging.Formatter('%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s')
     )
 
-    logger.addHandler(file_handler)
+    _logger.addHandler(file_handler)
 
-    return logger
+    return _logger
 
 
 class GracefullyExit(object):
@@ -84,6 +84,7 @@ class GetGoods(object):
         self.mongo[MONGO_DB_NAME][MONGO_COLLECTION_NAME].create_index([
             ('id', pymongo.ASCENDING), ('date', pymongo.DESCENDING), ('shop_id', pymongo.ASCENDING)
         ])
+        self.mongo[MONGO_DB_NAME][MONGO_LOG_NAME].create_index([('date', pymongo.DESCENDING)])
 
         self.logger = init_logger(name=self.__class__.__name__, task_id=self.task_id, log_dir=log_dir)
 
@@ -306,11 +307,17 @@ class GetGoods(object):
 
             shop_info = self.redis.spop(REDIS_KEY_SHOP_URLS)
             if not shop_info:
-                self.redis.hset(REDIS_KEY_TASK_RUNNING, 'end', datetime.now().strftime(DATE_TIME_FORMAT))
-                self.logger.info('{0} {1} -> {2} {0}'.format(
-                    '=' * 40, (self.redis.hget(REDIS_KEY_TASK_RUNNING, 'start') or b'').decode(),
-                    (self.redis.hget(REDIS_KEY_TASK_RUNNING, 'end') or b'').decode()
-                ))
+                start = self.redis.hget(REDIS_KEY_TASK_RUNNING, 'start').decode()
+                end = datetime.now()
+                today = datetime.fromordinal(end.today().toordinal())
+                if start:
+                    start = datetime.strptime(start, DATE_TIME_FORMAT)
+                    count = self.mongo[MONGO_DB_NAME][MONGO_COLLECTION_NAME].find({'date': today}).count()
+                    self.mongo[MONGO_DB_NAME][MONGO_LOG_NAME].insert({
+                        'start': start, 'end': end, 'date': today, 'count': count
+                    })
+                    self.logger.info('{0} {1} -> {2} = {3} {0}'.format('=' * 40, start, end, count))
+
                 self.redis.delete(REDIS_KEY_TASK_RUNNING)
                 break
 
