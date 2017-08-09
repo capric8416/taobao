@@ -111,6 +111,8 @@ class GoodsGrab(RedisSpider):
         base_info['shop_type'] = '淘宝'
         base_info['goods_id'] = re.search(r'itemId=(\d*)', response.url).group(1)
         base_info['modified'] = datetime.now()
+        now_today = datetime.today()
+        base_info['date'] = datetime.fromordinal(now_today.toordinal())
 
         yield items.TaobaoSukItem(detail={'goods_info': base_info})
 
@@ -152,4 +154,6 @@ class GoodsGrab(RedisSpider):
         item['price'] = json.loads(json_text).get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
         item['modified'] = datetime.now()
         item['shop_type'] = '天猫'
+        now_today = datetime.today()
+        item['date'] = datetime.fromordinal(now_today.toordinal())
         return item

@@ -41,7 +41,7 @@ class ProxySwift(object):
         requests.packages.urllib3.disable_warnings()
         return requests.get(url, params=source_data, verify=False, *p, **kwargs)
 
-    def get_ip(self, interface_id='', pool_id='2'):
+    def get_ip(self, interface_id='', pool_id='1'):
         url = 'https://api.proxyswift.com/ip/get'
         data = {
             'server_id': self.server_id,
@@ -121,7 +121,7 @@ if __name__ == '__main__':
 
     p = ProxySwift()
     # 参数为 ip的id
-    p.changes_ip(26)
+    # p.changes_ip(26)
     # 参数也为ip的id，不给时  获取所有ip
     print(p.get_ip())
     # import requests
