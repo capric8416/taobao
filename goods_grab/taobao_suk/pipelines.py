@@ -9,7 +9,7 @@ import hashlib
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 from traceback import format_exc
-
+from datetime import datetime
 
 class TaobaoSukPipeline(object):
 
@@ -36,6 +36,7 @@ class TaobaoSukPipeline(object):
     def open_spider(self, spider):
         self.client = MongoClient(self.mongo_uri)
         self.db = self.client[self.mongo_db]
+        self.start_time = datetime.fromordinal(datetime.today().toordinal())
 
         for k, v in self.collection_name_list.items():
             for v_items in v:
@@ -56,4 +57,9 @@ class TaobaoSukPipeline(object):
         return item
 
     def close_spider(self, spider):
+        num = self.db['goods_info'].find({'date': datetime.fromordinal(datetime.today().toordinal())}).count()
+        shop_info_log = {'start': self.start_time,
+                         'end': datetime.fromordinal(datetime.today().toordinal()),
+                         'count': num}
+        self.db['goods_info_log'].insert(shop_info_log)
         self.client.close()
