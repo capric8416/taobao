@@ -81,12 +81,15 @@ class TaobaoSpider(scrapy.Spider):
             shop_info['shop_name'] = item['rawTitle']
             shop_info['address'] = item['provcity']
             shop_info['zhang_gui'] = item['nick']
-            shop_info['shop_id'] = item['nid']
+            shop_info['shop_id'] = int(item['nid'])
             shop_info['shop_deng_ji'] = item['shopIcon']['iconClass']
             shop_info['shop_type'] = '天猫' if response.meta['shop_type'] else '淘宝'
             shop_info['url'] = 'https:{}'.format(item['shopUrl'])
             shop_info['modified'] = datetime.now()
-            shop_info['date'] = datetime.now().strftime('%Y-%m-%d')
+            shop_info['keyword'] = response.meta['word']
+            shop_info['date'] = datetime.today()
+            shop_info['date'] = datetime.fromordinal(shop_info['date'].toordinal())
+
 
             self.rds.sadd('shop_urls', json.dumps(('https:{}'.format(item['shopUrl']), response.meta['word'])))
             yield items.TaobaoSukItem(detail={'shop_info': shop_info})

@@ -2,8 +2,6 @@
 
 supervisorctl stop goods_list
 
-for k in $(seq 1 20)
-do
-pkill -f goods_list.py
-pkill -f chrome
-done
+ps -ef | grep -E "get_goods.py" | grep -v grep | awk '{print $2}' | xargs kill -9
+
+ps -ef | grep -E "chrome" | grep -v grep | awk '{print $2}' | xargs kill -9

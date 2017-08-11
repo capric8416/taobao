@@ -6,5 +6,7 @@ pymongo
 redis
 requests
 pyquery
-selenium
 pyvirtualdisplay
+websockets
+git+https://github.com/capric8416/pychrome.git
+git+https://github.com/6148cirpac/proxy_swift.git

@@ -114,3 +114,6 @@ RETRY_TIMES = 10
 #HTTPCACHE_DIR = 'httpcache'
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
+
+
+REDIS_START_URLS_AS_SET = True

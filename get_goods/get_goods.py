@@ -27,37 +27,36 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
-
 REDIS_KEY_SHOP_URLS = 'shop_urls'
 REDIS_KEY_GOODS_URLS = 'goods_grab:start_urls'
 REDIS_KEY_TASK_RUNNING = 'running_task_goods_list'
 
 MONGO_DB_NAME = 'test'
 MONGO_COLLECTION_NAME = 'goods_list'
+MONGO_LOG_NAME = 'goods_list_logs'
 
-DATE_FORMAT = '%Y-%m-%d'
 DATE_TIME_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
 
 def init_logger(name, task_id, log_dir):
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    _logger = logging.getLogger(name)
+    _logger.setLevel(logging.INFO)
 
     log_dir = os.path.expanduser(log_dir)
     if not os.path.exists(log_dir) or not os.path.isdir(log_dir):
         os.makedirs(log_dir, exist_ok=True)
 
     file_handler = logging.handlers.TimedRotatingFileHandler(
-        filename=os.path.join(log_dir, f'{task_id}.log'), when='H', encoding='utf-8'
+        filename=os.path.join(log_dir, f'{task_id}.log'), when='D', encoding='utf-8'
     )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(
         logging.Formatter('%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s')
     )
 
-    logger.addHandler(file_handler)
+    _logger.addHandler(file_handler)
 
-    return logger
+    return _logger
 
 
 class GracefullyExit(object):
@@ -85,6 +84,7 @@ class GetGoods(object):
         self.mongo[MONGO_DB_NAME][MONGO_COLLECTION_NAME].create_index([
             ('id', pymongo.ASCENDING), ('date', pymongo.DESCENDING), ('shop_id', pymongo.ASCENDING)
         ])
+        self.mongo[MONGO_DB_NAME][MONGO_LOG_NAME].create_index([('date', pymongo.DESCENDING)])
 
         self.logger = init_logger(name=self.__class__.__name__, task_id=self.task_id, log_dir=log_dir)
 
@@ -157,6 +157,11 @@ class GetGoods(object):
                 now = datetime.now()
                 today = now.today()
 
+                price_highlight = right.find_element_by_xpath(
+                    'child::p[@class="d-price"]/em[@class="h"]').text.strip('￥')
+                price_del = right.find_element_by_xpath('child::p[@class="d-price"]/del').text.strip('￥')
+                sales_volume = right.find_element_by_xpath('child::p[@class="info"]/span[@class="d-num"]/em').text
+
                 goods_info = {
                     'id': int(goods_id),
                     'url': goods_url,
@@ -164,19 +169,19 @@ class GetGoods(object):
                     'shop_id': int(shop_id),
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
-                    'date': today.strftime(DATE_FORMAT),
+                    'date': datetime.fromordinal(today.toordinal()),
                     'modified': now,
                     'image': left.find_element_by_xpath('child::img').get_attribute('src'),
                     'title': right.find_element_by_xpath('child::h3[@class="d-title"]').text,
-                    'price_highlight': right.find_element_by_xpath('child::p[@class="d-price"]/em[@class="h"]').text,
-                    'price_del': right.find_element_by_xpath('child::p[@class="d-price"]/del').text,
-                    'sales_volume': right.find_element_by_xpath('child::p[@class="info"]/span[@class="d-num"]/em').text
+                    'price_highlight': float(price_highlight),
+                    'price_del': float(price_del) if price_del else None,
+                    'sales_volume': int(sales_volume)
                 }
 
                 goods_list.append(goods_info)
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.lpush(REDIS_KEY_GOODS_URLS, goods_url)
+                self.redis.sadd(REDIS_KEY_GOODS_URLS, goods_url)
         except Exception as e:
             self.logger.error(e)
         else:
@@ -194,6 +199,9 @@ class GetGoods(object):
                 now = datetime.now()
                 today = now.today()
 
+                price_highlight = a.find_element_by_xpath(
+                    'descendant::div[@class="tii_price"]').text.split()[0].text.strip('￥')
+
                 goods_info = {
                     'id': int(goods_id),
                     'url': goods_url,
@@ -201,12 +209,12 @@ class GetGoods(object):
                     'shop_id': int(shop_id),
                     'keyword': urllib.parse.unquote(keyword),
                     'search': self.browser.current_url,
-                    'date': today.strftime(DATE_FORMAT),
+                    'date': datetime.fromordinal(today.toordinal()),
                     'modified': now,
                     'image': a.find_element_by_xpath('descendant::img[@class="ti_img"]').get_attribute('src'),
                     'title': a.find_element_by_xpath('descendant::div[@class="tii_title"]/h3').text,
-                    'price_highlight': a.find_element_by_xpath('descendant::div[@class="tii_price"]').text.split()[0],
-                    'price_del': '',
+                    'price_highlight': float(price_highlight),
+                    'price_del': None,
                     'sales_volume': a.find_element_by_xpath(
                         'descendant::div[@class="tii_price"]/span[@class="tii_sold"]').text
                 }
@@ -216,7 +224,7 @@ class GetGoods(object):
                 goods_list.append(goods_info)
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.lpush(REDIS_KEY_GOODS_URLS, goods_url)
+                self.redis.sadd(REDIS_KEY_GOODS_URLS, goods_url)
         except Exception as e:
             self.logger.error(e)
         else:
@@ -299,11 +307,17 @@ class GetGoods(object):
 
             shop_info = self.redis.spop(REDIS_KEY_SHOP_URLS)
             if not shop_info:
-                self.redis.hset(REDIS_KEY_TASK_RUNNING, 'end', datetime.now().strftime(DATE_TIME_FORMAT))
-                self.logger.info('{0} {1} -> {2} {0}'.format(
-                    '=' * 40, (self.redis.hget(REDIS_KEY_TASK_RUNNING, 'start') or b'').decode(),
-                    (self.redis.hget(REDIS_KEY_TASK_RUNNING, 'end') or b'').decode()
-                ))
+                start = self.redis.hget(REDIS_KEY_TASK_RUNNING, 'start').decode()
+                end = datetime.now()
+                today = datetime.fromordinal(end.today().toordinal())
+                if start:
+                    start = datetime.strptime(start, DATE_TIME_FORMAT)
+                    count = self.mongo[MONGO_DB_NAME][MONGO_COLLECTION_NAME].find({'date': today}).count()
+                    self.mongo[MONGO_DB_NAME][MONGO_LOG_NAME].insert({
+                        'start': start, 'end': end, 'date': today, 'count': count
+                    })
+                    self.logger.info('{0} {1} -> {2} = {3} {0}'.format('=' * 40, start, end, count))
+
                 self.redis.delete(REDIS_KEY_TASK_RUNNING)
                 break
 
@@ -353,7 +367,6 @@ class TaskDispatcher(object):
         self.mongo_url = mongo_url
         self.log_dir = log_dir
 
-        self.proxy_pool = ProxyPool()
         self.proxy_swift = ProxySwift()
 
         self.logger = init_logger(name=self.__class__.__name__, task_id=0, log_dir=log_dir)
@@ -365,10 +378,7 @@ class TaskDispatcher(object):
     def reset_proxy(self, proxy_id):
         self.logger.info('proxy.{}: launching'.format(proxy_id))
 
-        self.proxy_pool.change_ip('http://115.237.237.167:10003')
-        self.proxy_swift.changes_ip(proxy_id)
-
-        proxy = 'http://{ip}:{port}'.format(**self.proxy_swift.get_ip(proxy_id)[0])
+        proxy = 'http://{ip}:{port}'.format(**self.proxy_swift.change_ip(proxy_id))
         self.logger.info('proxy.{}: {}'.format(proxy_id, proxy))
 
         return proxy
@@ -381,7 +391,7 @@ class TaskDispatcher(object):
         fecher.run()
 
     def run(self):
-        tasks = {i: None for i in (range(27, 33) if self.enable_proxy else range(27, 28))}
+        tasks = {i: None for i in (range(23, 57) if self.enable_proxy else range(23, 24))}
 
         while True:
             for task_id in tasks:

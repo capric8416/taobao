@@ -1,0 +1,20 @@
+# 第1列分钟0~59
+# 第2列小时0~23 (0表示子夜)
+# 第3列日1~31
+# 第4列月1~12
+# 第5列星期0~7 (0和7都表示星期天)
+# 第6列要运行的命令
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
+
+# empty tmp
+0 23 * * * /usr/bin/task_empty_tmp &>/root/data/logs/taobao/cron_tasks/empty_tmp.log
+
+# shop_list spider
+30 23 * * * /usr/bin/task_shop_list &>/root/data/logs/taobao/cron_tasks/shop_list.log
+
+# goods_list spider
+0 0 * * * /usr/bin/task_goods_list &>/root/data/logs/taobao/cron_tasks/goods_list.log
+
+# goods_detail spider
+0 8 * * * /usr/bin/task_goods_detail &>/root/data/logs/taobao/cron_tasks/goods_detail.log

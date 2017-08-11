@@ -99,7 +99,7 @@ class GoodsGrab(RedisSpider):
         item['totalQuantity'] = data.get('dynStock', {}).get('sellableQuantity', 0)  # 库存
         item['deliveryAddress'] = data.get('deliveryFee', {}).get('data', {}).get('sendCity', '')  # 发货地
         try:
-            item['goods_id'] = re.search(r'itemId=(\d*)', response.url).group(1)  # 宝贝id
+            item['goods_id'] = int(re.search(r'itemId=(\d*)', response.url).group(1))  # 宝贝id
         except Exception as e:
             self.logger.error(e)
 
@@ -113,8 +113,9 @@ class GoodsGrab(RedisSpider):
         base_info = response.meta['data']
         base_info.update(item)
         base_info['shop_type'] = '淘宝'
-        # base_info['goods_id'] = re.search(r'itemId=(\d*)', response.url).group(1)
         base_info['modified'] = datetime.now()
+        now_today = datetime.today()
+        base_info['date'] = datetime.fromordinal(now_today.toordinal())
 
         yield items.TaobaoSukItem(detail={'goods_info': base_info})
 
@@ -151,7 +152,7 @@ class GoodsGrab(RedisSpider):
         item['deliveryAddress'] = re.search(r'"deliveryAddress":"(.*?)\"\,', text).group(1)  # 发货地
         item['rate_counts'] = re.search(r'"rateCounts":(\d*?)\,', text).group(1)  # 累计评价
         item['totalQuantity'] = re.search(r'"totalQuantity":(\d*?)\,', text).group(1)  # 库存
-        item['goods_id'] = re.search(r'id=(\d*)', response.url).group(1)
+        item['goods_id'] = int(re.search(r'id=(\d*)', response.url).group(1))
         json_text = re.search(r'var _DATA_Mdskip =\s({.*?})\s</script>', text).group(1)
         item['price'] = json.loads(json_text).get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
         price = item['price'].split('-')
@@ -162,4 +163,6 @@ class GoodsGrab(RedisSpider):
             item['month_sales'] = item['sell_count'] * float(price[0])
         item['shop_type'] = '天猫'
         item['modified'] = datetime.now()
+        now_today = datetime.today()
+        item['date'] = datetime.fromordinal(now_today.toordinal())
         return item

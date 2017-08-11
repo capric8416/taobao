@@ -17,7 +17,7 @@ class TaobaoSukPipeline(object):
     collection_name_list = \
         {
               'base_info': ('goods_id',),
-              'shop_info': ('shop_id', 'date'),
+              'shop_info': ('date',),
          }
 
     def __init__(self, mongo_uri, mongo_db):

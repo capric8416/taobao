@@ -40,7 +40,7 @@ class ProxySwift(object):
         source_data.update({'sign': sign})
         return requests.get(url, params=source_data, verify=False, *p, **kwargs)
 
-    def get_ip(self, interface_id='', pool_id='2'):
+    def get_ip(self, interface_id='', pool_id='1'):
         url = 'https://api.proxyswift.com/ip/get'
         data = {
             'server_id': self.server_id,
