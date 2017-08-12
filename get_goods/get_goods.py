@@ -73,10 +73,10 @@ class GracefullyExit(object):
 
 
 class GetGoods(object):
-    def __init__(self, task_id, max_pages, proxy, redis_url, mongo_url, log_dir):
+    def __init__(self, task_id, max_pages, enable_proxy, redis_url, mongo_url, log_dir):
         self.task_id = task_id
         self.max_pages = max_pages
-        self.proxy = proxy
+        self.enable_proxy = enable_proxy
 
         self.redis = redis.from_url(redis_url)
 
@@ -86,13 +86,25 @@ class GetGoods(object):
         ])
         self.mongo[MONGO_DB_NAME][MONGO_LOG_NAME].create_index([('date', pymongo.DESCENDING)])
 
+        self.proxy_swift = ProxySwift()
+
         self.logger = init_logger(name=self.__class__.__name__, task_id=self.task_id, log_dir=log_dir)
 
         self.display = Display(visible=0, size=(800, 600))
         self.browser = self.open_browser()
 
+    def reset_proxy(self):
+        self.logger.info('proxy.{}: launching'.format(self.task_id))
+
+        proxy = 'http://{ip}:{port}'.format(**self.proxy_swift.change_ip(self.task_id))
+        self.logger.info('proxy.{}: {}'.format(self.task_id, proxy))
+
+        return proxy
+
     def open_browser(self, default='Chrome'):
         self.logger.info('browser: launching')
+
+        proxy = self.reset_proxy() if self.enable_proxy else None
 
         self.display.start()
 
@@ -104,9 +116,8 @@ class GetGoods(object):
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('window-size=360,640')
             chrome_options.add_experimental_option('prefs', {'profile.managed_default_content_settings.images': 2})
-
-            if self.proxy:
-                chrome_options.add_argument('--proxy-server={}'.format(self.proxy))
+            if proxy:
+                chrome_options.add_argument('--proxy-server={}'.format(proxy))
 
             browser_kwargs = {'chrome_options': chrome_options}
             browser_class = webdriver.Chrome
@@ -120,8 +131,8 @@ class GetGoods(object):
             browser_class = webdriver.PhantomJS
 
             service_args = ['--load-images=no']
-            if self.proxy:
-                service_args.append('--proxy={}'.format(self.proxy))
+            if proxy:
+                 service_args.append('--proxy={}'.format(proxy))
 
             browser_kwargs = {'desired_capabilities': desired_capabilities, 'service_args': service_args}
         else:
@@ -307,7 +318,7 @@ class GetGoods(object):
 
             shop_info = self.redis.spop(REDIS_KEY_SHOP_URLS)
             if not shop_info:
-                start = self.redis.hget(REDIS_KEY_TASK_RUNNING, 'start').decode()
+                start = (self.redis.hget(REDIS_KEY_TASK_RUNNING, 'start') or b'').decode()
                 end = datetime.now()
                 today = datetime.fromordinal(end.today().toordinal())
                 if start:
@@ -357,7 +368,7 @@ class GetGoods(object):
 
 class TaskDispatcher(object):
     def __init__(
-        self, max_pages, enable_proxy=True, log_dir='~/data/logs/get_goods/',
+        self, max_pages, enable_proxy=True, log_dir='~/data/logs/taobao/goods_list/',
         redis_url=os.environ.get('REDIS_URL') or 'redis://localhost:6379/1',
         mongo_url=os.environ.get('MONGO_URL') or 'mongodb://localhost:27017/'
     ):
@@ -367,25 +378,15 @@ class TaskDispatcher(object):
         self.mongo_url = mongo_url
         self.log_dir = log_dir
 
-        self.proxy_swift = ProxySwift()
-
         self.logger = init_logger(name=self.__class__.__name__, task_id=0, log_dir=log_dir)
 
         self.gracefully_exit = GracefullyExit()
 
         self.redis = redis.from_url(redis_url)
 
-    def reset_proxy(self, proxy_id):
-        self.logger.info('proxy.{}: launching'.format(proxy_id))
-
-        proxy = 'http://{ip}:{port}'.format(**self.proxy_swift.change_ip(proxy_id))
-        self.logger.info('proxy.{}: {}'.format(proxy_id, proxy))
-
-        return proxy
-
-    def task(self, task_id, proxy):
+    def task(self, task_id):
         fecher = GetGoods(
-            task_id=task_id, max_pages=self.max_pages, proxy=proxy,
+            task_id=task_id, max_pages=self.max_pages, enable_proxy=self.enable_proxy,
             redis_url=self.redis_url, mongo_url=self.mongo_url, log_dir=self.log_dir
         )
         fecher.run()
@@ -396,9 +397,7 @@ class TaskDispatcher(object):
         while True:
             for task_id in tasks:
                 if not tasks[task_id] or not tasks[task_id].is_alive():
-                    proxy = self.reset_proxy(proxy_id=task_id) if self.enable_proxy else None
-
-                    process = multiprocessing.Process(name=task_id, target=self.task, args=(task_id, proxy))
+                    process = multiprocessing.Process(name=task_id, target=self.task, args=(task_id,))
                     process.start()
 
                     tasks[task_id] = process
