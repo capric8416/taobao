@@ -66,12 +66,11 @@ class GoodsGrab(RedisSpider):
             'origin_place': '//ul[@class="attributes-list"]//li[contains(text(),"产地")]/@title',  # 产地
             'color_type': '//ul[@class="attributes-list"]//li[contains(text(),"颜色分类")]/@title',  # 颜色分类
             'rule_type': '//ul[@class="attributes-list"]//li[contains(text(),"规格类型")]/@title',  # 规格类型
-            'month': '//ul[@class="attributes-list"]//li[contains(text(),"月份")]/@title'  # 月份
-            'is_special': '//ul[@class="attributes-list"]//li[contains(text(),"是否为特殊用途化妆品")]/@title'
-            'use_date_range': '//ul[@class="attributes-list"]//li[contains(text(),"限期使用日期范围")]/@title'
-            'net_content': '//ul[@class="attributes-list"]//li[contains(text(),"化妆品净含量")]/@title'
-            'single_product': '//ul[@class="attributes-list"]//li[contains(text(),"面膜单品")]/@title'
-
+            'month': '//ul[@class="attributes-list"]//li[contains(text(),"月份")]/@title',  # 月份
+            'is_special': '//ul[@class="attributes-list"]//li[contains(text(),"是否为特殊用途化妆品")]/@title',
+            'use_date_range': '//ul[@class="attributes-list"]//li[contains(text(),"限期使用日期范围")]/@title',
+            'net_content': '//ul[@class="attributes-list"]//li[contains(text(),"化妆品净含量")]/@title',
+            'single_product': '//ul[@class="attributes-list"]//li[contains(text(),"面膜单品")]/@title',
         }
         tree = lxml.etree.HTML(response.text)
         result = {}
