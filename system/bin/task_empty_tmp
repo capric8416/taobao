@@ -2,4 +2,4 @@
 
 cd /tmp/
 
-ls -a | xargs rm -rf
+ls -A | xargs rm -rf
