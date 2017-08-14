@@ -26,7 +26,7 @@ class TaobaoSpider(scrapy.Spider):
         if flag:
             return
 
-        base_url = 'https://shopsearch.taobao.com/search?app=shopsearch&q={}'
+        base_url = 'https://shopsearch.taobao.com/search?app=shopsearch&q={}&sort=sale-desc'
         # world_list = ['papa recipe']
         world_list = ['papa recipe', 'LEADERS', 'CNP',
                       'JAYJUN', 'SNP', 'MEDIHEAL', 'JM Solution',
