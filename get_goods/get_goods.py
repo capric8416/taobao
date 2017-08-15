@@ -47,7 +47,7 @@ def init_logger(name, task_id, log_dir):
         os.makedirs(log_dir, exist_ok=True)
 
     file_handler = logging.handlers.TimedRotatingFileHandler(
-        filename=os.path.join(log_dir, f'{task_id}.log'), when='D', encoding='utf-8'
+        filename=os.path.join(log_dir, f'{task_id}.log'), when='D', backupCount=30, encoding='utf-8'
     )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(
