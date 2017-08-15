@@ -7,6 +7,8 @@ import random
 
 
 class ProxySwift(object):
+    server_id = '2'
+    pool_id = '1'
 
     def requerst_get(self, url, data, *p, **kwargs):
         SecretKey = 'Kg6t55fc39FQRJuh92BwZBMXyK3sWFkJ'
@@ -37,19 +39,21 @@ class ProxySwift(object):
         md_5.update(data.encode("utf-8"))
         sign = md_5.hexdigest()
         source_data.update({'sign': sign})
-        requests.packages.urllib3.disable_warnings()
         return requests.get(url, params=source_data, verify=False, *p, **kwargs)
 
-    def get_ip(self, interface_id='', pool_id='1'):
+    def get_ip(self, interface_id=''):
         url = 'https://api.proxyswift.com/ip/get'
         data = {
-            'server_id': '2',
-            'pool_id': pool_id,
+            'server_id': self.server_id,
+            'pool_id': self.pool_id,
             'interface_id': interface_id,
         }
         r = self.requerst_get(url, data)
         response = r.json()
-        return response
+        for item in response['data']:
+            del item['server_id']
+            del item['pool_id']
+        return response['data']
 
     def get_task(self, task_id):
         url = 'https://api.proxyswift.com/task/get'
@@ -61,27 +65,34 @@ class ProxySwift(object):
     def changes_ip(self, interface_id, filter=24):
         url = 'https://api.proxyswift.com/ip/change'
         data = {
-            'server_id': '2',
+            'server_id': self.server_id,
             'interface_id': interface_id,
             'filter': filter,
         }
 
         r = self.requerst_get(url, data)
-        task_id = r.json()['taskId']
-        #status = self(task_id)['status']
+        data = r.json()
+        assert data['code'] == 202, '换ip失败'
+        task_id = data['data']['task_id']
+        assert task_id is not None, 'taskId is None, response_result:{}'.format(r.text)
 
         i = 1
         while True:
             time.sleep(i%2+1)
-            status = self.get_task(task_id)['status']
+            data = self.get_task(task_id)
+
+            assert data['code'] == 200, '获取任务失败'
+            status = data['data']['status']
             if status == 'success':
                 ip_port = self.get_ip(interface_id)
                 return ip_port
+            elif status == 'failed':
+                return None
 
 
 
 class ProxyPool(object):
-    def __init__(self, proxyswift=ProxySwift(), interval = 4):
+    def __init__(self, proxyswift=ProxySwift(), interval=4):
 
         self.interval = interval
         self.ps = proxyswift
@@ -99,10 +110,12 @@ class ProxyPool(object):
         for ip in self.pool:
             if proxy_server == "http://%(ip)s:%(port)s" % ip:
                 self.pool.pop(0)
-                self.ps.changes_ip(ip['id'])
-                self.pool = self.ps.get_ip()
-                time.sleep(1)
-                break
+                if self.ps.changes_ip(ip['id']):
+                    self.pool = self.ps.get_ip()
+                    time.sleep(1)
+                    break
+                else:
+                    self.change_ip(proxy_server)
 
 
 def refresh():

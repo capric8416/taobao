@@ -8,12 +8,13 @@ import random
 
 class ProxySwift(object):
     server_id = '2'
+    pool_id = '1'
 
     def requerst_get(self, url, data, *p, **kwargs):
         SecretKey = 'Kg6t55fc39FQRJuh92BwZBMXyK3sWFkJ'
+
         PartnerID = '2017072514450843'
         TimeStamp = int(time.time())
-
 
         source_data = {
             'partner_id': PartnerID,
@@ -38,19 +39,21 @@ class ProxySwift(object):
         md_5.update(data.encode("utf-8"))
         sign = md_5.hexdigest()
         source_data.update({'sign': sign})
-        requests.packages.urllib3.disable_warnings()
         return requests.get(url, params=source_data, verify=False, *p, **kwargs)
 
-    def get_ip(self, interface_id='', pool_id='1'):
+    def get_ip(self, interface_id=''):
         url = 'https://api.proxyswift.com/ip/get'
         data = {
             'server_id': self.server_id,
-            'pool_id': pool_id,
+            'pool_id': self.pool_id,
             'interface_id': interface_id,
         }
         r = self.requerst_get(url, data)
         response = r.json()
-        return response
+        for item in response['data']:
+            del item['server_id']
+            del item['pool_id']
+        return response['data']
 
     def get_task(self, task_id):
         url = 'https://api.proxyswift.com/task/get'
@@ -68,16 +71,23 @@ class ProxySwift(object):
         }
 
         r = self.requerst_get(url, data)
-        task_id = r.json()['taskId']
-        #status = self(task_id)['status']
+        data = r.json()
+        assert data['code'] == 202, '换ip失败'
+        task_id = data['data']['task_id']
+        assert task_id is not None, 'taskId is None, response_result:{}'.format(r.text)
 
         i = 1
         while True:
             time.sleep(i%2+1)
-            status = self.get_task(task_id)['status']
+            data = self.get_task(task_id)
+
+            assert data['code'] == 200, '获取任务失败'
+            status = data['data']['status']
             if status == 'success':
                 ip_port = self.get_ip(interface_id)
                 return ip_port
+            elif status == 'failed':
+                return None
 
 
 class ProxyPool(object):
@@ -90,18 +100,22 @@ class ProxyPool(object):
         self.pool = self.ps.get_ip()
 
     def get(self):
-        #从 pool中随机取一个ip
-        ip = "{0}:10003".format(random.choice(self.pool)['ip'])
+        # 从 pool中随机取一个ip
+        ip_port = random.choice(self.pool)
+        ip = "{0}:{1}".format(ip_port['ip'], ip_port['port'])
         return ip
 
-    def change_ip(self,proxy_server):
+    def change_ip(self, proxy_server):
         for ip in self.pool:
             if proxy_server == "http://%(ip)s:%(port)s" % ip:
                 self.pool.pop(0)
-                self.ps.changes_ip(ip['id'])
-                self.pool = self.ps.get_ip()
-                time.sleep(1)
-                break
+                if self.ps.changes_ip(ip['id']):
+                    self.pool = self.ps.get_ip()
+                    time.sleep(1)
+                    break
+                else:
+                    self.change_ip(proxy_server)
+
 
 def refresh():
     s = ProxySwift()
@@ -111,19 +125,22 @@ def refresh():
         s.changes_ip(ip_list['id'])
 
 refresh()
+
+proxyPool = ProxyPool()
+
 if __name__ == '__main__':
     # p = ProxyPool()
-    #
-    # # 随机获取一个ip
+    # #
+    # # # 随机获取一个ip
     # print(p.get())
-    # # 换ip,  参数为http://115.237.237.167:10003
-    # p.change_ip('http://115.237.237.167:10003')
+    # # # 换ip,  参数为http://115.237.237.167:10003
+    # p.change_ip('http://114.231.145.115:10000')
 
     p = ProxySwift()
     # 参数为 ip的id
-    # p.changes_ip(26)
+    p.changes_ip(11)
     # 参数也为ip的id，不给时  获取所有ip
-    print(p.get_ip())
+    # print(p.get_ip())
     # import requests
     # ip_list = p.get_ip()
     # for item in ip_list:
@@ -132,5 +149,6 @@ if __name__ == '__main__':
     #     }
     #     r = requests.get('http://bj.58.com/', proxies=proxies)
     #     pass
+
 
 
