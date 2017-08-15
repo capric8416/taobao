@@ -17,4 +17,4 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
 0 0 * * * /usr/bin/task_goods_list &>/root/data/logs/taobao/cron_tasks/goods_list.log
 
 # goods_detail spider
-0 8 * * * /usr/bin/task_goods_detail &>/root/data/logs/taobao/cron_tasks/goods_detail.log
+0 7 * * * /usr/bin/task_goods_detail &>/root/data/logs/taobao/cron_tasks/goods_detail.log

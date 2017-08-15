@@ -319,17 +319,17 @@ class GetGoods(object):
             shop_info = self.redis.spop(REDIS_KEY_SHOP_URLS)
             if not shop_info:
                 start = (self.redis.hget(REDIS_KEY_TASK_RUNNING, 'start') or b'').decode()
-                end = datetime.now()
-                today = datetime.fromordinal(end.today().toordinal())
-                if start:
+                if start and self.redis.delete(REDIS_KEY_TASK_RUNNING) > 0:
                     start = datetime.strptime(start, DATE_TIME_FORMAT)
+                    end = datetime.now()
+                    today = datetime.fromordinal(end.today().toordinal())
                     count = self.mongo[MONGO_DB_NAME][MONGO_COLLECTION_NAME].find({'date': today}).count()
+
                     self.mongo[MONGO_DB_NAME][MONGO_LOG_NAME].insert({
                         'start': start, 'end': end, 'date': today, 'count': count
                     })
                     self.logger.info('{0} {1} -> {2} = {3} {0}'.format('=' * 40, start, end, count))
 
-                self.redis.delete(REDIS_KEY_TASK_RUNNING)
                 break
 
             shop_url, keyword = json.loads(shop_info)

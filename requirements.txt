@@ -6,6 +6,7 @@ pymongo
 redis
 requests
 pyquery
+selenium
 pyvirtualdisplay
 websockets
 git+https://github.com/capric8416/pychrome.git
