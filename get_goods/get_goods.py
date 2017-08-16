@@ -132,7 +132,7 @@ class GetGoods(object):
 
             service_args = ['--load-images=no']
             if proxy:
-                 service_args.append('--proxy={}'.format(proxy))
+                service_args.append('--proxy={}'.format(proxy))
 
             browser_kwargs = {'desired_capabilities': desired_capabilities, 'service_args': service_args}
         else:
@@ -210,8 +210,12 @@ class GetGoods(object):
                 now = datetime.now()
                 today = now.today()
 
-                price_highlight = a.find_element_by_xpath(
-                    'descendant::div[@class="tii_price"]').text.split()[0].text.strip('￥')
+                price_highlight = a.find_element_by_xpath('descendant::div[@class="tii_price"]').text.split()[0]
+                price_highlight = re.sub(r'.*?(\d+).*', r'\g<1>', price_highlight)
+
+                sales_volume = a.find_element_by_xpath(
+                    'descendant::div[@class="tii_price"]/span[@class="tii_sold"]').text
+                sales_volume = re.sub(r'.*?(\d+).*', r'\g<1>', sales_volume)
 
                 goods_info = {
                     'id': int(goods_id),
@@ -226,11 +230,8 @@ class GetGoods(object):
                     'title': a.find_element_by_xpath('descendant::div[@class="tii_title"]/h3').text,
                     'price_highlight': float(price_highlight),
                     'price_del': None,
-                    'sales_volume': a.find_element_by_xpath(
-                        'descendant::div[@class="tii_price"]/span[@class="tii_sold"]').text
+                    'sales_volume': int(sales_volume)
                 }
-                goods_info['price_highlight'] = re.sub(r'.*?(\d+).*', r'\g<1>', goods_info['price_highlight'])
-                goods_info['sales_volume'] = re.sub(r'.*?(\d+).*', r'\g<1>', goods_info['sales_volume'])
 
                 goods_list.append(goods_info)
 
@@ -342,9 +343,11 @@ class GetGoods(object):
 
             # # 测试天猫
             # keyword = 'AHC'
+            # shop_id = 114223508
             # request_url = 'https://shop114223508.m.taobao.com/#list?q=AHC'
-            # 测试淘宝
+            # # 测试淘宝
             # keyword = '%E9%9F%A9%E5%9B%BD'
+            # shop_id = 34135992
             # request_url = 'https://shop34135992.m.taobao.com/#list?q=%E9%9F%A9%E5%9B%BD'
 
             self.browser.get(request_url)
