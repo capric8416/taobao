@@ -4,6 +4,7 @@
 from proxy_swift import *
 
 from datetime import datetime
+import inspect
 import json
 import logging
 import logging.handlers
@@ -142,7 +143,7 @@ class GetGoods(object):
             try:
                 browser = browser_class(**browser_kwargs)
             except Exception as e:
-                self.logger.warning('browser: {}'.format(e))
+                self.logger.exception(f'browser {self.__class__.__name__}.{inspect.currentframe().f_code.co_name}: {e}')
             else:
                 self.logger.info('browser: ' + default)
                 return browser
@@ -194,7 +195,7 @@ class GetGoods(object):
                 self.logger.info('goods: {}'.format(goods_info))
                 self.redis.sadd(REDIS_KEY_GOODS_URLS, goods_url)
         except Exception as e:
-            self.logger.error(e)
+            self.logger.exception(f'{self.__class__.__name__}.{inspect.currentframe().f_code.co_name}: {e}')
         else:
             self.mongo[MONGO_DB_NAME][MONGO_COLLECTION_NAME].insert_many(goods_list)
 
@@ -211,7 +212,7 @@ class GetGoods(object):
                 today = now.today()
 
                 price_highlight = a.find_element_by_xpath('descendant::div[@class="tii_price"]').text.split()[0]
-                price_highlight = re.sub(r'.*?(\d+).*', r'\g<1>', price_highlight)
+                price_highlight = re.sub(r'.*?(\d+\.*\d*).*', r'\g<1>', price_highlight)
 
                 sales_volume = a.find_element_by_xpath(
                     'descendant::div[@class="tii_price"]/span[@class="tii_sold"]').text
@@ -238,7 +239,7 @@ class GetGoods(object):
                 self.logger.info('goods: {}'.format(goods_info))
                 self.redis.sadd(REDIS_KEY_GOODS_URLS, goods_url)
         except Exception as e:
-            self.logger.error(e)
+            self.logger.exception(f'{self.__class__.__name__}.{inspect.currentframe().f_code.co_name}: {e}')
         else:
             self.mongo[MONGO_DB_NAME][MONGO_COLLECTION_NAME].insert_many(goods_list)
 
@@ -343,8 +344,8 @@ class GetGoods(object):
 
             # # 测试天猫
             # keyword = 'AHC'
-            # shop_id = 114223508
-            # request_url = 'https://shop114223508.m.taobao.com/#list?q=AHC'
+            # shop_id = 117058577
+            # request_url = 'https://shop117058577.m.taobao.com/#list?q=AHC'
             # # 测试淘宝
             # keyword = '%E9%9F%A9%E5%9B%BD'
             # shop_id = 34135992
