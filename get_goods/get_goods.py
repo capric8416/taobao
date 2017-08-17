@@ -389,11 +389,11 @@ class TaskDispatcher(object):
         self.redis = redis.from_url(redis_url)
 
     def task(self, task_id):
-        fecher = GetGoods(
+        fetcher = GetGoods(
             task_id=task_id, max_pages=self.max_pages, enable_proxy=self.enable_proxy,
             redis_url=self.redis_url, mongo_url=self.mongo_url, log_dir=self.log_dir
         )
-        fecher.run()
+        fetcher.run()
 
     def run(self):
         tasks = {i: None for i in (range(23, 57) if self.enable_proxy else range(23, 24))}
