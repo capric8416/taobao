@@ -15,7 +15,7 @@ class TaobaoSpider(scrapy.Spider):
     allowed_domains = ["taobao.com", "tmall.hk", "tmall.com"]
     start_urls = ['http://taobao.com/']
 
-    redis_url = os.environ.get('REDIS_URL', None) or 'redis://10.0.54.45:6378'
+    redis_url = os.environ.get('REDIS_URL', None) or 'redis://10.0.54.54:6378'
     pool = redis.ConnectionPool.from_url(redis_url)
     rds = redis.StrictRedis(connection_pool=pool)
 
@@ -58,17 +58,17 @@ class TaobaoSpider(scrapy.Spider):
         tianmao_url = 'https://shopsearch.taobao.com/search?app=shopsearch&q={}&ie=utf8&isb=1'
 
         for w in world_list:
-            yield scrapy.Request(tianmao_url.format(w), callback=self.parse, meta={'word': w, 'shop_type': 1})
+            yield scrapy.Request(tianmao_url.format(w), callback=self.parse, meta={'word': w, 'shop_type': '天猫'})
 
         quanqiugou_url = 'https://shopsearch.taobao.com/search?app=shopsearch&q={}&ie=utf8&shop_type=2&isb=&ratesum='
 
         for w in world_list:
-            yield scrapy.Request(quanqiugou_url.format(w), callback=self.parse, meta={'word': w, 'shop_type': 0})
+            yield scrapy.Request(quanqiugou_url.format(w), callback=self.parse, meta={'word': w, 'shop_type': ''})
 
         for w in itertools.product(world_list, addrs_list, shop_type, xing_ji):
             url_ = base_url + addrs_url + shop_type_url + xing_ji_url
             url = url_.format(*w)
-            yield scrapy.Request(url, callback=self.parse, meta={'word': w[0], 'shop_type': 0})
+            yield scrapy.Request(url, callback=self.parse, meta={'word': w[0], 'shop_type': '淘宝'})
 
     def parse(self, response):
         # url_list = re.findall(r'shopUrl":"(//.*?.taobao.com)"', response.text)
@@ -83,13 +83,12 @@ class TaobaoSpider(scrapy.Spider):
             shop_info['zhang_gui'] = item['nick']
             shop_info['shop_id'] = int(item['nid'])
             shop_info['shop_deng_ji'] = item['shopIcon']['iconClass']
-            shop_info['shop_type'] = '天猫' if response.meta['shop_type'] else '淘宝'
+            shop_info['shop_type'] = response.meta['shop_type']
             shop_info['url'] = 'https:{}'.format(item['shopUrl'])
             shop_info['modified'] = datetime.now()
             shop_info['keyword'] = response.meta['word']
             shop_info['date'] = datetime.today()
             shop_info['date'] = datetime.fromordinal(shop_info['date'].toordinal())
-
 
             self.rds.sadd('shop_urls', json.dumps(('https:{}'.format(item['shopUrl']), response.meta['word'])))
             yield items.TaobaoSukItem(detail={'shop_info': shop_info})
