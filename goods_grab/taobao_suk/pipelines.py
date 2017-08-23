@@ -37,6 +37,7 @@ class TaobaoSukPipeline(object):
         self.client = MongoClient(self.mongo_uri)
         self.db = self.client[self.mongo_db]
         self.start_time = datetime.now()
+        self.date = datetime.fromordinal(datetime.today().toordinal())
 
         for k, v in self.collection_name_list.items():
             for v_items in v:
@@ -60,7 +61,7 @@ class TaobaoSukPipeline(object):
         num = self.db['goods_info'].find({'date': datetime.fromordinal(datetime.today().toordinal())}).count()
         shop_info_log = {'start': self.start_time,
                          'end': datetime.now(),
-                         'date': datetime.fromordinal(datetime.today().toordinal()) ,
+                         'date': self.date,
                          'count': num}
         self.db['goods_info_log'].insert(shop_info_log)
         self.client.close()
