@@ -34,7 +34,7 @@ class TaobaoSukPipeline(object):
     def open_spider(self, spider):
         self.client = MongoClient(self.mongo_uri)
         self.db = self.client[self.mongo_db]
-        self.start_time = datetime.now().toordinal()
+        self.start_time = datetime.now()
         self.date = datetime.fromordinal(datetime.today().toordinal())
 
         for k, v in self.collection_name_list.items():
