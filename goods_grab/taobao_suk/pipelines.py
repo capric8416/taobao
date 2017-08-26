@@ -9,7 +9,7 @@ import hashlib
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 from traceback import format_exc
-from datetime import datetime
+from datetime import datetime, timedelta
 
 class TaobaoSukPipeline(object):
 
@@ -17,7 +17,6 @@ class TaobaoSukPipeline(object):
     collection_name_list = \
         {
               'goods_info': ('goods_id', 'modified', 'date'),
-              'shop_info': ('date',),
          }
 
     unique_index = 'pag_id'
@@ -46,7 +45,20 @@ class TaobaoSukPipeline(object):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id
         try:
             dict_item = dict(item['detail'])
-            # self.db[self.collection_name].insert(dict_item)
+            query_item_today = self.db['goods_list'].findOne({'id': dict_item['goods_id'], 'date': dict_item['date']})
+            
+            date = datetime.today() - timedelta(days=1)
+            date = date.toordinal()
+            date = datetime.fromordinal(date)
+            query_item = self.db['goods_list'].findOne({'id': dict_item['goods_id'], 'date': date})
+            
+            if query_item:
+                quantity = query_item.get('quantity', 0)
+            else:
+                quantity = 0
+            
+            dict_item['Daily_Sales'] = query_item_today.get('quantity', 0) - quantity
+            
             for k, v in dict_item.items():
                 self.db[k].insert(v)
 
@@ -65,3 +77,4 @@ class TaobaoSukPipeline(object):
                          'count': num}
         self.db['goods_info_log'].insert(shop_info_log)
         self.client.close()
+
