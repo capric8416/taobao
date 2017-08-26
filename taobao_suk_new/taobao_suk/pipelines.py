@@ -16,7 +16,6 @@ class TaobaoSukPipeline(object):
     collection_name = 'taobao_info'
     collection_name_list = \
         {
-              'base_info': ('goods_id',),
               'shop_info': ('date',),
          }
 
@@ -40,6 +39,7 @@ class TaobaoSukPipeline(object):
         for k, v in self.collection_name_list.items():
             for v_items in v:
                 self.db[k].ensure_index(v_items)
+        self.db['shop_info_main'].ensure_index('shop_id', unique=True)
 
     def process_item(self, item, spider):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id
@@ -54,6 +54,20 @@ class TaobaoSukPipeline(object):
             spider.logger.debug(' duplicate key error collection')
         except:
             spider.logger.error(format_exc())
+
+
+        try:
+            dict_item = dict(item['detail'])
+            # self.db[self.collection_name].insert(dict_item)
+            for k, v in dict_item.items():
+                self.db['shop_info_main'].insert(v)
+
+            spider.logger.debug(dict_item)
+        except DuplicateKeyError:
+            spider.logger.debug(' duplicate key error collection')
+        except:
+            spider.logger.error(format_exc())
+
         return item
 
     def close_spider(self, spider):
