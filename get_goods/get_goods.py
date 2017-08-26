@@ -424,7 +424,7 @@ class TaskDispatcher(object):
 
     def run(self):
         if self.redis.scard(REDIS_KEY_DUMMY_SHOP_URLS) == 0:
-            values = self.redis.smembers(REDIS_KEY_SHOP_URLS)
+            values = list(self.redis.smembers(REDIS_KEY_SHOP_URLS))
             for i in range(0, len(values), 100):
                 self.redis.sadd(REDIS_KEY_DUMMY_SHOP_URLS, *values[i: i + 100])
 
