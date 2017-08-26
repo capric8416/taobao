@@ -107,5 +107,5 @@ ENV/
 .DS_Store
 
 # swap
-.swp
-.kate-swp
+*.swp
+*.kate-swp

@@ -29,6 +29,7 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
 REDIS_KEY_SHOP_URLS = 'shop_urls'
+REDIS_KEY_DUMMY_SHOP_URLS = 'dummy_shop_urls'
 REDIS_KEY_GOODS_URLS = 'goods_grab:start_urls'
 REDIS_KEY_TASK_RUNNING = 'running_task_goods_list'
 
@@ -311,14 +312,14 @@ class GetGoods(object):
 
         pages = 0
 
-        if self.redis.exists(REDIS_KEY_SHOP_URLS):
+        if self.redis.exists(REDIS_KEY_DUMMY_SHOP_URLS):
             self.redis.hsetnx(REDIS_KEY_TASK_RUNNING, 'start', datetime.now().strftime(DATE_TIME_FORMAT))
 
         while True:
             if pages > 0 and pages % self.max_pages == 0:
                 break
 
-            shop_info = self.redis.spop(REDIS_KEY_SHOP_URLS)
+            shop_info = self.redis.spop(REDIS_KEY_DUMMY_SHOP_URLS)
             if not shop_info:
                 start = (self.redis.hget(REDIS_KEY_TASK_RUNNING, 'start') or b'').decode()
                 if start and self.redis.delete(REDIS_KEY_TASK_RUNNING) > 0:
@@ -396,6 +397,10 @@ class TaskDispatcher(object):
         fetcher.run()
 
     def run(self):
+        if self.redis.scard(REDIS_KEY_DUMMY_SHOP_URLS) == 0:
+            values = self.redis.smembers(REDIS_KEY_SHOP_URLS)
+            self.redis.sadd(REDIS_KEY_DUMMY_SHOP_URLS, *values)
+
         tasks = {i: None for i in (range(23, 57) if self.enable_proxy else range(23, 24))}
 
         while True:
