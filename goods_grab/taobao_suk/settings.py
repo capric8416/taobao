@@ -16,7 +16,7 @@ NEWSPIDER_MODULE = 'taobao_suk.spiders'
 
 DOWNLOAD_TIMEOUT = 6
 # Specify the host and port to use when connecting to Redis (optional).
-REDIS_HOST = os.environ.get('REDIS_HOST', '10.0.54.45')
+REDIS_HOST = os.environ.get('REDIS_HOST', '10.0.54.54')
 # REDIS_HOST = os.environ.get('REDIS_HOST', '192.168.131.128')
 REDIS_PORT = int(os.environ.get('REDIS_PORT', 6378))
 
@@ -80,7 +80,7 @@ ITEM_PIPELINES = {
 }
 
 import os
-MONGODB_HOST = os.environ.get('MONGODB_HOST', '10.0.54.45')
+MONGODB_HOST = os.environ.get('MONGODB_HOST', '10.0.54.54')
 MONGODB_PORT = os.environ.get('MONGODB_PORT', '27017')
 if os.environ.get('MONGO_URL', None):
     MONGODB_URI = os.environ.get('MONGO_URL')
