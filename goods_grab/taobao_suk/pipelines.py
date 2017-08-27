@@ -45,8 +45,8 @@ class TaobaoSukPipeline(object):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id
         try:
             dict_item = dict(item['detail'])
-			goods_info_ = dict_item['goods_info']
-            query_item_today = self.db['goods_list'].findOne({'id': goods_info_['goods_id'], 'date': goods_info_['date']})
+            goods_info_ = dict_item['goods_info']
+            query_item_today = self.db['goods_list'].find_one({'id': goods_info_['goods_id'], 'date': goods_info_['date']})
             
             date = datetime.today() - timedelta(days=1)
             date = date.toordinal()
