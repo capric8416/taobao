@@ -415,7 +415,7 @@ class TaskDispatcher(object):
 
             for i in range(0, len(goods_list), 100):
                 items = goods_list[i: i + 100]
-                self.redis.sadd(REDIS_KEY_GOODS_URLS, *[item['id'] for item in items])
+                self.redis.sadd(REDIS_KEY_GOODS_URLS, *[item['url'] for item in items])
                 self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].insert_many(items)
 
             self.logger.info('{0} {1}'.format(datetime.now(), len(goods_list)))
