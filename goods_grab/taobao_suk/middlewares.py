@@ -71,7 +71,7 @@ def _retry(max_retry_times, request, reason, spider):
 
 def change_ip(request):
     proxy_server = request.meta['proxy']
-	proxy_pool.change_ip(proxy_server)
+    proxy_pool.change_ip(proxy_server)
 
 
 
