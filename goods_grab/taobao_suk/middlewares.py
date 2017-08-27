@@ -7,14 +7,20 @@
 from scrapy.utils.gz import gunzip, is_gzipped
 from scrapy.exceptions import IgnoreRequest
 from scrapy import signals
-from .ProxySwift import ProxyPool
+from .ProxySwift import ProxyPool, proxy_pool
 # from taobao_suk.ProxySwift import cmdline
 # from taobao_suk.ProxySwift.ProxyPool import *
 import datetime
 import logging
-proxy_pool = ProxyPool()
+# proxy_pool = ProxyPool()
 
 # cmdline.refresh_ip()
+
+# 启动代理池
+proxy_pool.blacklist_clean_timing = 60*60*24
+# proxy_pool.advance_time = 299
+proxy_pool.redis_url = 'redis://:liuchangshigedashuaigekannicaibucaidedao@116.196.93.208:46400'
+proxy_pool.start()
 
 
 logger = logging.getLogger(__name__)
