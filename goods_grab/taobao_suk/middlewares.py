@@ -71,11 +71,8 @@ def _retry(max_retry_times, request, reason, spider):
 
 def change_ip(request):
     proxy_server = request.meta['proxy']
-    for ip in proxy_pool.pool:
-        if proxy_server == "http://%(ip)s:%(port)s" % ip:
-            proxy_pool.change_ip(proxy_server)
-            # cmdline.change_ip(proxy_server)
-            break
+	proxy_pool.change_ip(proxy_server)
+
 
 
 class TaobaoSukSpiderMiddleware(object):
