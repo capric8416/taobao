@@ -45,19 +45,20 @@ class TaobaoSukPipeline(object):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id
         try:
             dict_item = dict(item['detail'])
-            query_item_today = self.db['goods_list'].findOne({'id': dict_item['goods_id'], 'date': dict_item['date']})
+			goods_info_ = dict_item['goods_info']
+            query_item_today = self.db['goods_list'].findOne({'id': goods_info_['goods_id'], 'date': goods_info_['date']})
             
             date = datetime.today() - timedelta(days=1)
             date = date.toordinal()
             date = datetime.fromordinal(date)
-            query_item = self.db['goods_list'].findOne({'id': dict_item['goods_id'], 'date': date})
+            query_item = self.db['goods_list'].findOne({'id': goods_info_['goods_id'], 'date': date})
             
             if query_item:
                 quantity = query_item.get('quantity', 0)
             else:
                 quantity = 0
             
-            dict_item['Daily_Sales'] = query_item_today.get('quantity', 0) - quantity
+            dict_item['goods_info']['Daily_Sales'] = query_item_today.get('quantity', 0) - quantity
             
             for k, v in dict_item.items():
                 self.db[k].insert(v)
