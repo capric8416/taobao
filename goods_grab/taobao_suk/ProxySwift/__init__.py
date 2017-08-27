@@ -124,7 +124,7 @@ def refresh():
     for ip_list in ip_info_list:
         s.changes_ip(ip_list['id'])
 
-refresh()
+# refresh()
 
 proxyPool = ProxyPool()
 

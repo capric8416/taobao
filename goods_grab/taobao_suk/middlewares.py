@@ -151,6 +151,16 @@ class RetryMiddlewareDataIsNull(object):
                 return retry_return
             else:
                 raise IgnoreRequest()
+		
+		if response.status == 302 and 'login.taobao.com' in str(response.headers.get('Location', '')):
+            retry_return = _retry(self.max_retry_times, request, 'Data Is Null', spider)
+
+            change_ip(request)
+
+            if retry_return:
+                return retry_return
+            else:
+                raise IgnoreRequest()
 
         return response
 
