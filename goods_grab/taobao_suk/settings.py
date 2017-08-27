@@ -28,7 +28,7 @@ if os.environ.get('REDIS_URL', None):
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
 
-LOG_LEVEL = 'INFO'
+LOG_LEVEL = 'DEBUG'
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 #CONCURRENT_REQUESTS = 32
 
@@ -90,7 +90,7 @@ MONGODB_DATABASE = os.environ.get('MONGODB_DATABASE', 'test')
 
 # retry #
 RETRY_ENABLED = True
-RETRY_HTTP_CODES = [302, 301]
+# RETRY_HTTP_CODES = [302, 301]
 RETRY_TIMES = 10
 
 
