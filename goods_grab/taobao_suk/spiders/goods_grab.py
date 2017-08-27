@@ -119,9 +119,9 @@ class GoodsGrab(RedisSpider):
 
     def tianmao_m_pag(self, response):
         xpath_item = {
-            'shop_name': '//div[@class="shop-t"]/text()',  # 店铺名称
-            'name': '//h1/text()',  # 宝贝名称
-            'original_price': '//section[@id="s-price"]//span[@class="mui-price-integer"]/text()',  # 原价格
+            'shop_name': '//div[@class="shop-name"]/text()',  # 店铺名称
+            'name': '//div[@class="main"]/text()',  # 宝贝名称
+            'original_price': '//span[@class="price"]/text()',  # 原价格
         }
         tree = lxml.etree.HTML(response.text)
 
@@ -161,11 +161,10 @@ class GoodsGrab(RedisSpider):
         text = response.text
 
         item['sell_count'] = int(self.regular_expression_match(r'"sellCount":(\d*?)\,', text, 0))  # 销量
-        item['deliveryAddress'] = self.regular_expression_match(r'"deliveryAddress":"(.*?)\"\,', text, '')
-        item['rate_counts'] = self.regular_expression_match(r'"rateCounts":(\d*?)\,', text, 0) # 累计评价
+        item['deliveryAddress'] = self.regular_expression_match(r'"from":(.*?),', text, '')
+        item['rate_counts'] = self.regular_expression_match(r'"commentCount":(\d+?),', text, 0) # 累计评价
         item['totalQuantity'] = self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, 0) # 库存
-        json_text = self.regular_expression_match(r'var _DATA_Mdskip =\s({.*?})\s</script>', text, '{}')
-        item['price'] = json.loads(json_text).get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
+        item['price'] = self.regular_expression_match(r'{"priceText":"(\d*)"}', text, 0) # 价格
         self.logger.info('tianmao regular match: {}'.format(item))
         price = str(item['price']).split('-')
         if len(price) >= 2:
