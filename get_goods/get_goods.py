@@ -423,6 +423,10 @@ class TaskDispatcher(object):
         self.logger.info('{0} {1} {0}'.format('=' * 40, datetime.now()))
 
     def run(self):
+        if self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].find_one(
+                {'date': datetime.fromordinal(datetime.today().toordinal())}):
+            return
+
         if self.redis.scard(REDIS_KEY_DUMMY_SHOP_URLS) == 0:
             values = list(self.redis.smembers(REDIS_KEY_SHOP_URLS))
             for i in range(0, len(values), 100):
