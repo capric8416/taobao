@@ -115,7 +115,6 @@ class GoodsGrab(RedisSpider):
         base_info['modified'] = datetime.now()
         now_today = datetime.today()
         base_info['date'] = datetime.fromordinal(now_today.toordinal())
-
         yield items.TaobaoSukItem(detail={'goods_info': base_info})
 
     def tianmao_m_pag(self, response):
@@ -129,9 +128,18 @@ class GoodsGrab(RedisSpider):
         item = {}
         for key in xpath_item:
             item[key] = ''.join(tree.xpath(xpath_item[key]))
+	
+        try:
+            item['goods_id'] = int(re.search(r'id=(\d*)', response.url).group(1))
+        except Exception as e:
+            self.logger.error(e)
 
         products = ''.join(tree.xpath('//div[@class="mui-standardItemProps mdv-standardItemProps"]/@mdv-cfg'))
-        props = json.loads(products).get('data', {}).get('props', [])
+        try:
+            props = json.loads(products).get('data', {}).get('props', [])
+        except Exception as e:
+            props = []
+            self.logger.error(e)
 
         key_item = {
             '品牌': 'brand',
@@ -145,16 +153,21 @@ class GoodsGrab(RedisSpider):
             key = data.get('ptext', '')
             if key in key_item:
                 item[key_item[key]] = ''.join(data.get('vtexts', ''))
+        if not props:
+            for k, v in key_item.items():
+                item[v] = ''
+	        
 
         text = response.text
-        item['sell_count'] = re.search(r'"sellCount":(\d*?)\,', text).group(1)  # 销量
-        item['deliveryAddress'] = re.search(r'"deliveryAddress":"(.*?)\"\,', text).group(1)  # 发货地
-        item['rate_counts'] = re.search(r'"rateCounts":(\d*?)\,', text).group(1)  # 累计评价
-        item['totalQuantity'] = re.search(r'"totalQuantity":(\d*?)\,', text).group(1)  # 库存
-        item['goods_id'] = int(re.search(r'id=(\d*)', response.url).group(1))
-        json_text = re.search(r'var _DATA_Mdskip =\s({.*?})\s</script>', text).group(1)
+
+        item['sell_count'] = int(self.regular_expression_match(r'"sellCount":(\d*?)\,', text, 0))  # 销量
+        item['deliveryAddress'] = self.regular_expression_match(r'"deliveryAddress":"(.*?)\"\,', text, '')
+        item['rate_counts'] = self.regular_expression_match(r'"rateCounts":(\d*?)\,', text, 0) # 累计评价
+        item['totalQuantity'] = self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, 0) # 库存
+        json_text = self.regular_expression_match(r'var _DATA_Mdskip =\s({.*?})\s</script>', text, '{}')
         item['price'] = json.loads(json_text).get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
-        price = item['price'].split('-')
+        self.logger.info('tianmao regular match: {}'.format(item))
+        price = str(item['price']).split('-')
         if len(price) >= 2:
             # 30天销售额
             item['month_sales'] = str(item['sell_count'] * float(price[0])) + '-' + str(item['sell_count'] * float(price[-1]))
@@ -165,3 +178,13 @@ class GoodsGrab(RedisSpider):
         now_today = datetime.today()
         item['date'] = datetime.fromordinal(now_today.toordinal())
         return item
+
+    def regular_expression_match(self, regular, text, default=''):
+        try:
+            result = re.search(regular, text)
+            result = result.group(1) if result else default
+            return result
+        except Exception as e:
+            self.logger.error(e)
+            return default
+	    
