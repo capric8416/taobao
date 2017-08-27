@@ -152,7 +152,7 @@ class RetryMiddlewareDataIsNull(object):
             else:
                 raise IgnoreRequest()
 		
-		if response.status == 302 and 'login.taobao.com' in str(response.headers.get('Location', '')):
+        if response.status == 302 and 'login.taobao.com' in str(response.headers.get('Location', '')):
             retry_return = _retry(self.max_retry_times, request, 'Data Is Null', spider)
 
             change_ip(request)
