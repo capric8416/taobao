@@ -51,7 +51,7 @@ class TaobaoSukPipeline(object):
             date = datetime.today() - timedelta(days=1)
             date = date.toordinal()
             date = datetime.fromordinal(date)
-            query_item = self.db['goods_list'].findOne({'id': goods_info_['goods_id'], 'date': date})
+            query_item = self.db['goods_list'].find_one({'id': goods_info_['goods_id'], 'date': date})
             
             if query_item:
                 quantity = query_item.get('quantity', 0)
