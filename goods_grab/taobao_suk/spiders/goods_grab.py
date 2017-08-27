@@ -161,10 +161,10 @@ class GoodsGrab(RedisSpider):
         text = response.text
 
         item['sell_count'] = int(self.regular_expression_match(r'"sellCount":(\d*?)\,', text, 0))  # 销量
-        item['deliveryAddress'] = self.regular_expression_match(r'"from":(.*?),', text, '')
+        item['deliveryAddress'] = self.regular_expression_match(r'"deliveryAddress":(.*?),', text, '') or self.regular_expression_match(r'"from":(.*?),', text, '')
         item['rate_counts'] = self.regular_expression_match(r'"commentCount":(\d+?),', text, 0) # 累计评价
         item['totalQuantity'] = self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, 0) # 库存
-        item['price'] = self.regular_expression_match(r'{"priceText":"(\d*)"}', text, 0) # 价格
+        item['price'] = self.regular_expression_match(r'<span class="mui-price-integer">(.*?)</span>', text, 0) # 价格
         self.logger.info('tianmao regular match: {}'.format(item))
         price = str(item['price']).split('-')
         if len(price) >= 2:
