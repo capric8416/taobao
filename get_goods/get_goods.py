@@ -196,7 +196,6 @@ class GetGoods(object):
                 goods_list.append(goods_info)
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.sadd(REDIS_KEY_GOODS_URLS, goods_url)
         except Exception as e:
             self.logger.exception(f'{self.__class__.__name__}.{inspect.currentframe().f_code.co_name}: {e}')
         else:
@@ -240,7 +239,6 @@ class GetGoods(object):
                 goods_list.append(goods_info)
 
                 self.logger.info('goods: {}'.format(goods_info))
-                self.redis.sadd(REDIS_KEY_GOODS_URLS, goods_url)
         except Exception as e:
             self.logger.exception(f'{self.__class__.__name__}.{inspect.currentframe().f_code.co_name}: {e}')
         else:
