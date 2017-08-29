@@ -168,16 +168,19 @@ class GoodsGrab(RedisSpider):
         item['totalQuantity'] = self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, 0) # 库存
 
         json_text = self.regular_expression_match(r'var _DATA_Mdskip =\s({.*?})\s</script>', text, '{}')
-        item = json.loads(json_text)
-        if 'defaultModel' in item:
-            item['price'] = item.get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
-        if 'delivery' in item:
+        json_item = json.loads(json_text)
+
+        if 'defaultModel' in json_item:
+            item['price'] = json_item.get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
+
+        if 'delivery' in json_item:
             if not item['deliveryAddress']:
-                item['deliveryAddress'] = item.get('delivery', {}).get('from', '')
-        if 'price' in item:
+                item['deliveryAddress'] = json_item.get('delivery', {}).get('from', '')
+
+        if 'price' in json_item:
             if not item['original_price']:
-                item['original_price'] = item.get('price').get('extraPrices', [{}])[0].get('priceText', '')
-            item['price'] = item.get('price').get('price', {}).get('priceText', 0)
+                item['original_price'] = json_item.get('price').get('extraPrices', [{}])[0].get('priceText', '')
+            item['price'] = json_item.get('price').get('price', {}).get('priceText', 0)
 
         if not item['price']:
             item['price'] = self.regular_expression_match(r'<span class="mui-price-integer">(.*?)</span>', text, 0) # 价格
