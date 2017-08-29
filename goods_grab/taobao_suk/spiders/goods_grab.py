@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-import scrapy
-from scrapy_redis.spiders import RedisSpider
-import furl
-from datetime import datetime
 import re
 import lxml
 import json
+import furl
+import scrapy
+from datetime import datetime
 from taobao_suk import items
+from scrapy_redis.spiders import RedisSpider
 
 
 class GoodsGrab(RedisSpider):
@@ -167,8 +167,11 @@ class GoodsGrab(RedisSpider):
         item['rate_counts'] = self.regular_expression_match(r'"commentCount":(\d+?),', text, 0) # 累计评价
         item['totalQuantity'] = self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, 0) # 库存
 
-        json_text = self.regular_expression_match(r'var _DATA_Mdskip =\s({.*?})\s</script>', text, '{}')
+        json_text = self.regular_expression_match(r'var _DATA_Mdskip =([\s\S]*) </script>', text, '{}')
+        if not json_text:
+            json_text = self.regular_expression_match(r'var _DATA_Mdskip =\s({.*?})\s</script>', text, '{}')
         json_item = json.loads(json_text)
+        self.logger.info('tianmao get data:{}'.format(json_text))
 
         if 'defaultModel' in json_item:
             item['price'] = json_item.get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
