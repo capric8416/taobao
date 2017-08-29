@@ -137,7 +137,7 @@ class GoodsGrab(RedisSpider):
 
 	   if not item['shop_name']:
             item['shop_name'] = ''.join(tree.xpath('//div[@class="shop-t"]/text()'))
-            
+
         try:
             item['goods_id'] = int(re.search(r'id=(\d*)', response.url).group(1))
         except Exception as e:
@@ -177,7 +177,7 @@ class GoodsGrab(RedisSpider):
         item['totalQuantity'] = self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, 0) # 库存
 
         text = tree.xpath('//script[contains(text(), "_DATA_Mdskip")]/text()')
-        text = text[0] if text else ''
+        text = text[0] if text else '{}'
         json_text = text.replace('var _DATA_Mdskip =  ', '').replace('\n', '').strip()
 
         # json_text = self.regular_expression_match(r'var _DATA_Mdskip =([\s\S]*) </script>', text, '{}')
