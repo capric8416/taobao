@@ -102,7 +102,7 @@ class GoodsGrab(RedisSpider):
         except Exception as e:
             self.logger.error(e)
 
-        price = item['price'].split('-')
+        price = str(item['price']).split('-')
         if len(price) >= 2:
             # 30天销售额
             item['month_sales'] = str(item['sell_count'] * float(price[0])) + '-' + str(item['sell_count'] * float(price[-1]))
