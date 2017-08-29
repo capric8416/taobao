@@ -132,7 +132,7 @@ class GoodsGrab(RedisSpider):
         try:
             item['goods_id'] = int(re.search(r'id=(\d*)', response.url).group(1))
         except Exception as e:
-            self.logger.error(e)
+            self.logger.error('tianmao get goods id error,{}:{}'.format(response.url, error))
 
         products = ''.join(tree.xpath('//div[@class="mui-standardItemProps mdv-standardItemProps"]/@mdv-cfg'))
         try:
@@ -160,6 +160,7 @@ class GoodsGrab(RedisSpider):
 
         text = response.text
 
+        item['price'] = ''
         item['sell_count'] = int(self.regular_expression_match(r'"sellCount":(\d*?)\,', text, 0))  # 销量
         item['deliveryAddress'] = self.regular_expression_match(r'"deliveryAddress":(.*?),', text, '')
 
@@ -170,7 +171,6 @@ class GoodsGrab(RedisSpider):
         item = json.loads(json_text)
         if 'defaultModel' in item:
             item['price'] = item.get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
-
         if 'delivery' in item:
             if not item['deliveryAddress']:
                 item['deliveryAddress'] = item.get('delivery', {}).get('from', '')
@@ -181,7 +181,7 @@ class GoodsGrab(RedisSpider):
 
         if not item['price']:
             item['price'] = self.regular_expression_match(r'<span class="mui-price-integer">(.*?)</span>', text, 0) # 价格
-            
+
         self.logger.info('tianmao regular match: {}'.format(item))
         price = str(item['price']).split('-')
         if len(price) >= 2:
