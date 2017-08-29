@@ -128,7 +128,16 @@ class GoodsGrab(RedisSpider):
         item = {}
         for key in xpath_item:
             item[key] = ''.join(tree.xpath(xpath_item[key]))
-	
+
+        if not item['name']:
+            item['name'] = ''.join(tree.xpath('//div[@class="main"]/h1/text()'))
+
+        if not item['original_price']:
+            item['original_price'] = ''.join(tree.xpath('//span[@class="mui-price-integer"]/text()'))
+
+	   if not item['shop_name']:
+            item['shop_name'] = ''.join(tree.xpath('//div[@class="shop-t"]/text()'))
+            
         try:
             item['goods_id'] = int(re.search(r'id=(\d*)', response.url).group(1))
         except Exception as e:
