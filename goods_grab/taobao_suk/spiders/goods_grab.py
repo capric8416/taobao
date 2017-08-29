@@ -135,7 +135,7 @@ class GoodsGrab(RedisSpider):
         if not item['original_price']:
             item['original_price'] = ''.join(tree.xpath('//span[@class="mui-price-integer"]/text()'))
 
-	   if not item['shop_name']:
+        if not item['shop_name']:
             item['shop_name'] = ''.join(tree.xpath('//div[@class="shop-t"]/text()'))
 
         try:
