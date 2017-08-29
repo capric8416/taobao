@@ -187,6 +187,8 @@ class GoodsGrab(RedisSpider):
 
         if 'defaultModel' in json_item:
             item['price'] = json_item.get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
+            if not item['price']:
+                item['price'] = json_item.get('defaultModel', {}).get('itemPriceResultDO', {}).get('priceInfo', {}).get('def', {}).get('promotionList', [{}])[0].get('price', 0)
 
         if 'delivery' in json_item:
             if not item['deliveryAddress']:
