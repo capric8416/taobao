@@ -161,10 +161,27 @@ class GoodsGrab(RedisSpider):
         text = response.text
 
         item['sell_count'] = int(self.regular_expression_match(r'"sellCount":(\d*?)\,', text, 0))  # 销量
-        item['deliveryAddress'] = self.regular_expression_match(r'"deliveryAddress":(.*?),', text, '') or self.regular_expression_match(r'"from":(.*?),', text, '')
+        item['deliveryAddress'] = self.regular_expression_match(r'"deliveryAddress":(.*?),', text, '')
+
         item['rate_counts'] = self.regular_expression_match(r'"commentCount":(\d+?),', text, 0) # 累计评价
         item['totalQuantity'] = self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, 0) # 库存
-        item['price'] = self.regular_expression_match(r'<span class="mui-price-integer">(.*?)</span>', text, 0) # 价格
+
+        json_text = self.regular_expression_match(r'var _DATA_Mdskip =\s({.*?})\s</script>', text, '{}')
+        item = json.loads(json_text)
+        if 'defaultModel' in item:
+            item['price'] = item.get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
+
+        if 'delivery' in item:
+            if not item['deliveryAddress']:
+                item['deliveryAddress'] = item.get('delivery', {}).get('from', '')
+        if 'price' in item:
+            if not item['original_price']:
+                item['original_price'] = item.get('price').get('extraPrices', [{}])[0].get('priceText', '')
+            item['price'] = item.get('price').get('price', {}).get('priceText', 0)
+
+        if not item['price']:
+            item['price'] = self.regular_expression_match(r'<span class="mui-price-integer">(.*?)</span>', text, 0) # 价格
+            
         self.logger.info('tianmao regular match: {}'.format(item))
         price = str(item['price']).split('-')
         if len(price) >= 2:
