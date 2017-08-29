@@ -175,6 +175,8 @@ class GoodsGrab(RedisSpider):
 
         item['rate_counts'] = self.regular_expression_match(r'"commentCount":(\d+?),', text, 0) # 累计评价
         item['totalQuantity'] = self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, 0) # 库存
+        if not item['totalQuantity']: 
+            item['totalQuantity'] = regular_expression_match(r'"quantity":(\d+)', text, 0)
 
         text = tree.xpath('//script[contains(text(), "_DATA_Mdskip")]/text()')
         text = text[0] if text else '{}'
@@ -183,7 +185,11 @@ class GoodsGrab(RedisSpider):
         # json_text = self.regular_expression_match(r'var _DATA_Mdskip =([\s\S]*) </script>', text, '{}')
         # if not json_text:
         #     json_text = self.regular_expression_match(r'var _DATA_Mdskip =\s({.*?})\s</script>', text, '{}')
-        json_item = json.loads(json_text)
+        try:
+            json_item = json.loads(json_text)
+        except Exception as e:
+            self.logger.error(e)
+            json_item = {}
 
         if 'defaultModel' in json_item:
             item['price'] = json_item.get('defaultModel', {}).get('newJhsDO', {}).get('activityPrice', 0)
