@@ -176,7 +176,7 @@ class GoodsGrab(RedisSpider):
         item['rate_counts'] = self.regular_expression_match(r'"commentCount":(\d+?),', text, 0) # 累计评价
         item['totalQuantity'] = self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, 0) # 库存
         if not item['totalQuantity']: 
-            item['totalQuantity'] = regular_expression_match(r'"quantity":(\d+)', text, 0)
+            item['totalQuantity'] = self.regular_expression_match(r'"quantity":(\d+)', text, 0)
 
         text = tree.xpath('//script[contains(text(), "_DATA_Mdskip")]/text()')
         text = text[0] if text else '{}'
