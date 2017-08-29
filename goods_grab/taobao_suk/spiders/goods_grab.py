@@ -127,7 +127,7 @@ class GoodsGrab(RedisSpider):
 
         item = {}
         for key in xpath_item:
-            item[key] = ''.join(tree.xpath(xpath_item[key]))
+            item[key] = ''.join(tree.xpath(xpath_item[key])).replace('\n', '').strip()
 
         if not item['name']:
             item['name'] = ''.join(tree.xpath('//div[@class="main"]/h1/text()'))
