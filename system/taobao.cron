@@ -8,7 +8,7 @@
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
 
 # empty tmp
-0 * * * * /usr/bin/task_empty_tmp &>/root/data/logs/taobao/cron_tasks/empty_tmp.log
+# 0 * * * * /usr/bin/task_empty_tmp &>/root/data/logs/taobao/cron_tasks/empty_tmp.log
 
 # shop_list spider
 30 23 * * * /usr/bin/task_shop_list &>/root/data/logs/taobao/cron_tasks/shop_list.log

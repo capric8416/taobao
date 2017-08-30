@@ -1,0 +1,19 @@
+{
+  "name": "Dynamic Proxy",
+  "version": "0.3",
+  "description": "Dynamic Proxy",
+  "manifest_version": 2,
+  "permissions": [
+    "<all_urls>",
+    "browsingData",
+    "contentSettings",
+    "cookies",
+    "proxy",
+    "webRequest",
+    "webRequestBlocking"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  }
+}
