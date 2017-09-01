@@ -5,3 +5,6 @@ supervisorctl stop goods_list
 ps -ef | grep -E "get_goods.py" | grep -v grep | awk '{print $2}' | xargs kill -9
 
 ps -ef | grep -E "chrome" | grep -v grep | awk '{print $2}' | xargs kill -9
+
+supervisorctl start change_ip_task
+supervisorctl start test_ip_living_time_is_over_task
