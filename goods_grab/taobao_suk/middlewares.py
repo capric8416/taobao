@@ -19,7 +19,7 @@ import logging
 # 启动代理池
 proxy_pool.blacklist_clean_timing = 60*60*24
 # proxy_pool.advance_time = 299
-proxy_pool.redis_url = 'redis://:liuchangshigedashuaigekannicaibucaidedao@116.196.93.208:46400'
+proxy_pool.redis_url = ''
 proxy_pool.start()
 
 
