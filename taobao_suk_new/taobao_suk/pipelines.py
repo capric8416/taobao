@@ -47,7 +47,7 @@ class TaobaoSukPipeline(object):
             dict_item = dict(item['detail'])
             # self.db[self.collection_name].insert(dict_item)
             for k, v in dict_item.items():
-                self.db['shop_info_master'].update(v, upsert=True)
+                self.db['shop_info_master'].update(v['shop_id'], v, upsert=True)
                 self.db[k].insert(v)
 
             spider.logger.debug(dict_item)
