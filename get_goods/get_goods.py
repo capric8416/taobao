@@ -100,7 +100,7 @@ class GetGoods(object):
     def reset_proxy(self):
         self.logger.info('proxy.{}: launching'.format(self.task_id))
 
-        proxy = 'http://{ip}:{port}'.format(**self.proxy_swift.change_ip(self.task_id))
+        proxy = 'http://{ip}:{port}'.format(**self.proxy_swift.change_ip(interface_id=self.task_id, pool_id=3))
         self.logger.info('proxy.{}: {}'.format(self.task_id, proxy))
 
         return proxy
