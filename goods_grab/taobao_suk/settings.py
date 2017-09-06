@@ -80,7 +80,7 @@ ITEM_PIPELINES = {
 }
 
 import os
-MONGODB_HOST = os.environ.get('MONGODB_HOST', '10.0.54.54')
+MONGODB_HOST = os.environ.get('MONGODB_HOST', '10.0.10.51')
 MONGODB_PORT = os.environ.get('MONGODB_PORT', '27017')
 if os.environ.get('MONGO_URL', None):
     MONGODB_URI = os.environ.get('MONGO_URL')

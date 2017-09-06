@@ -77,12 +77,12 @@ class GoodsGrab(RedisSpider):
         for key in xpath_item:
             result[key] = ''.join(tree.xpath(xpath_item[key])).strip()
 
-
         url = "https://detailskip.taobao.com/service/getData/1/p1/item/detail/sib.htm?itemId={}&modules=dynStock," \
               "qrcode,viewer,price,duty,xmpPromotion,delivery,activity,fqg,zjys,couponActivity,soldQuantity,original" \
               "Price,tradeContract"
 
         goods_id = re.search(r'id=(\d*)', response.url).group(1)
+        result['goods_id'] = goods_id
         url_ = url.format(goods_id)
 
         return url_, result
@@ -97,10 +97,6 @@ class GoodsGrab(RedisSpider):
         item['sell_count'] = data.get('soldQuantity', {}).get('confirmGoodsCount', 0)  # 月销量
         item['totalQuantity'] = data.get('dynStock', {}).get('sellableQuantity', 0)  # 库存
         item['deliveryAddress'] = data.get('deliveryFee', {}).get('data', {}).get('sendCity', '')  # 发货地
-        try:
-            item['goods_id'] = int(re.search(r'itemId=(\d*)', response.url).group(1))  # 宝贝id
-        except Exception as e:
-            self.logger.error(e)
 
         price = str(item['price']).split('-')
         if len(price) >= 2:

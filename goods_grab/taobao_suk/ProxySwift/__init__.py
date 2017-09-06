@@ -77,7 +77,7 @@ class ProxyPool(object):
         self.__live_time = None
 
     def start(self):
-        redis_url = self.redis_url or os.environ.get('REDIS_URL', None)
+        redis_url = os.environ.get('REDIS_URL', None) or self.redis_url
         assert redis_url is not None, 'redis_url is None'
 
         pool = redis.ConnectionPool.from_url(redis_url)
