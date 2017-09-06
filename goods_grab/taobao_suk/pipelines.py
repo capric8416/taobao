@@ -46,8 +46,9 @@ class TaobaoSukPipeline(object):
         try:
             dict_item = dict(item['detail'])
             goods_info_ = dict_item['goods_info']
-            query_item_today = self.db['goods_list'].find_one({'id': goods_info_['goods_id'], 'date': goods_info_['date']})
-            
+            query_item_today = \
+                self.db['goods_list'].find_one({'id': goods_info_['goods_id'], 'date': goods_info_['date']})
+            spider.logger.debug('query_item_today: {}'.format(query_item_today))
             date = datetime.today() - timedelta(days=1)
             date = date.toordinal()
             date = datetime.fromordinal(date)
