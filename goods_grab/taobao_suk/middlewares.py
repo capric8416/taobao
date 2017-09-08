@@ -136,6 +136,7 @@ class RetryMiddlewareDataIsNull(object):
     def process_response(self, request, response, spider):
 
         if response.status == 302 and 'Spider-checklogin' in str(response.headers.get('Location', '')):
+            spider.logger.info('origin_url: {}'.format(response.url))
             retry_return = _retry(self.max_retry_times, request, 'Data Is Null', spider)
             change_ip(request)
             return retry_return
