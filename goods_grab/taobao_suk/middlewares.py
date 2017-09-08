@@ -47,7 +47,7 @@ class ProxyMiddleware(object):
 
     def process_exception(self, request, exception, spider):
         pass
-        print('99999999999999999999')
+        print('99999999999999999999{}'.format(exception))
 
 
 def _retry(max_retry_times, request, reason, spider):

@@ -20,13 +20,16 @@ proxy_pool.redis_url = ''    # 远端redis_url,不填自动从环境变量获取
 proxy_pool.blacklist_clean_timing = 60 * 60 * 24   # 多长时间清理一次黑名单列表默认24小时清理一次
 proxy_pool.advance_time = 0 # ip存活预留时间 默认不填的话是10秒，不能大于ip的存活时间
 proxy_pool.start()     #  启动代理池   只启动一次不要重复启动，在所有配置完了之后启动就好
+
 函数说明：
 get函数随机获取一个ip
 例子：
 proxy_pool.get()
+
 push_blacklist和change_ip目前为同一个接口，会自动通知主服务器，加快ip更换速度，并且再调用get函数的时候不会再出现拉黑的ip
 请在新项目中使用push_blacklist，主要用于拉黑ip，把ip加入黑名单，拉黑后
 例子：
+
 proxy_pool.push_blacklist('http://121.226.59.116:10000')
 '''
 root_path, file_name = os.path.split(os.path.realpath(__file__))
@@ -62,7 +65,7 @@ class ProxyPool(object):
     redis_url = None
     blacklist_clean_timing = 60 * 60 * 24
     advance_time = 0
-    __pool = None
+    __pool = []
     __pool_status = False
 
     def __init__(self):
@@ -75,9 +78,14 @@ class ProxyPool(object):
         self.logger.info(''.center(50, "*"))
         self.__redis = None
         self.__live_time = None
+        self.type_able_code = None
+        self.type_backup_code = None
 
     def start(self):
-        redis_url = os.environ.get('REDIS_URL', None) or self.redis_url
+        redis_url = self.redis_url or os.environ.get('REDIS_URL', None)
+        self.type_able_code = self.type_able_code if self.type_able_code is not None else [1000000]
+        self.type_backup_code = \
+            self.type_backup_code if self.type_backup_code is not None else [1000000, 1000001, 1000002]
         assert redis_url is not None, 'redis_url is None'
 
         pool = redis.ConnectionPool.from_url(redis_url)
@@ -90,36 +98,57 @@ class ProxyPool(object):
 
     def __get_all_ip(self):
         data = self.__redis.smembers(self.__available_ip_pool_key_name)
-        self.__pool = [json.loads(str(ip, 'utf-8')) for ip in data]
-        tmp = list()
-        for i in self.__pool:
+        __pool = [json.loads(str(ip, 'utf-8')) for ip in data]
+        tmp = dict()
+        tmp[1000000] = list()
+        tmp[1000001] = list()
+        tmp[1000002] = list()
+        for i in __pool:
             if i['ip'] not in self.__blacklist:
-                tmp.append(i)
-        self.__pool = tmp
+                if i['id'] < 1000000:
+                    tmp[1000000].append(i)
+                elif i['id'] == 1000001:
+                    tmp[1000001].append(i)
+                elif i['id'] == 1000002:
+                    tmp[1000002].append(i)
+        tmp_pool = list()
+        for code in self.type_able_code:
+            tmp_pool += tmp[code]
+        #  如果没有取到符合要求的ip  就启动备用方案
+
+        if not tmp_pool:
+            for code in self.type_backup_code:
+                tmp_pool += tmp[code]
+        self.__pool = tmp_pool
         # self.logger.debug('get_all_ip(): now self.pool : {}'.format(self.__pool))
         self.logger.debug('get_all_ip(): now self.pool len : {}'.format(len(self.__pool)))
 
     def get(self, _times=0):
         # 从 pool中随机取一个ip
-        if _times >= 10:
-            logging.info('retry times too many'.center(50, '*'))
-            time.sleep(20)
+        while True:
+            if _times >= 10:
+                logging.info('retry times too many'.center(50, '*'))
+                time.sleep(20)
 
-        if self.__pool:
-            ip_port = random.choice(self.__pool)
-            now = datetime.datetime.now().timestamp()
-            if ip_port['last_time'] >= int(now) + self.advance_time and ip_port['ip'] not in self.__blacklist:
-                tmp_ip = "{0}:{1}".format(ip_port['ip'], ip_port['port'])
-                return tmp_ip
+            if self.__pool:
+                ip_port = random.choice(self.__pool)
+
+                now = datetime.datetime.now().timestamp()
+                if ip_port['last_time'] >= int(now) + self.advance_time and ip_port['ip'] not in self.__blacklist:
+                    print(json.dumps(ip_port))
+                    tmp_ip = "{0}:{1}".format(ip_port['ip'], ip_port['port'])
+                    return tmp_ip
+                else:
+                    self.logger.debug('get(): ip in blacklist, or living is None, again')
+                    # self.__get_all_ip()
+                    _times += 1
+                    continue
             else:
-                self.logger.debug('get(): ip in blacklist, or living is None, again')
-                # self.__get_all_ip()
-                return self.get(_times=_times+1)
-        else:
-            time.sleep(0.1)
-            self.logger.debug('get(): __pool is None')
-            self.__get_all_ip()
-            return self.get(_times=_times+1)
+                time.sleep(0.1)
+                self.logger.debug('get(): __pool is None')
+                self.__get_all_ip()
+                _times += 1
+                continue
 
     def change_ip(self, proxy_server):
         self.push_blacklist(proxy_server)
@@ -150,11 +179,14 @@ class ProxyPool(object):
         return int(self.__live_time / clients)
 
     def __update_live_time(self, ip_item):
-        self.__redis.srem(self.__available_ip_pool_key_name, json.dumps(ip_item))
+        self.__redis.srem(self.__available_ip_pool_key_name,
+                          '{{"id": {id}, "ip": "{ip}", "port": {port}, "last_time": {last_time}}}'.format(**ip_item))
         self.logger.debug('update_live_time(): origin {}'.format(ip_item))
         ip_item['last_time'] -= self.__get_blacklist_seconds()
         self.logger.debug('update_live_time(): changed {}'.format(ip_item))
-        result = self.__redis.sadd(self.__available_ip_pool_key_name, json.dumps(ip_item))
+        result = self.__redis.sadd(self.__available_ip_pool_key_name,
+                                   '{{"id": {id}, "ip": "{ip}", "port": {port}, "last_time": {last_time}}}'.
+                                   format(**ip_item))
         self.logger.debug('update_live_time(): push redis available_ip_pool result{}'.format(result))
         # self.__get_all_ip()
 
