@@ -14,7 +14,7 @@ BOT_NAME = 'taobao_suk'
 SPIDER_MODULES = ['taobao_suk.spiders']
 NEWSPIDER_MODULE = 'taobao_suk.spiders'
 
-DOWNLOAD_TIMEOUT = 30
+DOWNLOAD_TIMEOUT = 15
 # Specify the host and port to use when connecting to Redis (optional).
 REDIS_HOST = os.environ.get('REDIS_HOST', '10.0.54.54')
 # REDIS_HOST = os.environ.get('REDIS_HOST', '192.168.131.128')
