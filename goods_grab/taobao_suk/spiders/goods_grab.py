@@ -225,4 +225,4 @@ class GoodsGrab(RedisSpider):
         except Exception as e:
             self.logger.error(e)
             return default
-	    
+

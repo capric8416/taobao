@@ -147,6 +147,13 @@ class RetryMiddlewareDataIsNull(object):
 
         if response.status == 302 and 'Spider-checklogin' in str(response.headers.get('Location', '')):
             retry_return = _retry(self.max_retry_times, request, 'Data Is Null', spider)
+            change_ip(request)
+            return retry_return
+
+        if response.status == 302 and '/__x5__/query.htm' in str(response.headers.get('Location', '')):
+            retry_return = _retry(self.max_retry_times, request, 'Data Is Null', spider)
+            change_ip(request)
+            return retry_return
 
         elif 'error' in response.url:
             retry_return = _retry(self.max_retry_times, request, 'url error', spider)
@@ -157,7 +164,6 @@ class RetryMiddlewareDataIsNull(object):
                 return retry_return
             else:
                 raise IgnoreRequest()
-		
         return response
 
 
