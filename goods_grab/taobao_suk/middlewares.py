@@ -34,16 +34,8 @@ class ProxyMiddleware(object):
     # proxy_list = next(proxy_genter)
 
     def process_request(self, request, spider):
-        pass
-        # global time_flag
-        # time_now_flag = int(datetime.datetime.today().strftime('%M'))
-        # if time_now_flag > time_flag:
-        #     proxy_server = proxy_pool.get()
-        #     proxy_pool.change_ip("http://%s" % proxy_server)
-        #     time_flag += 5
         proxy_server = proxy_pool.get()
         request.meta['proxy'] = "http://%s" % proxy_server
-        print(request.url, proxy_server)
 
     def process_exception(self, request, exception, spider):
         pass
