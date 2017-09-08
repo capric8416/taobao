@@ -133,16 +133,6 @@ class RetryMiddlewareDataIsNull(object):
     max_error_number = 10
     max_retry_times = 10
 
-    def check_keyword(self, body, response):
-        if 'http://www.qichacha.com/index_verify' in body:
-            return False
-        if '请先登录或者您没有这个权限' in body:
-            return False
-        elif 'www.qichacha.com/user_login' in response.url:
-            return False
-        else:
-            return True
-
     def process_response(self, request, response, spider):
 
         if response.status == 302 and 'Spider-checklogin' in str(response.headers.get('Location', '')):
@@ -151,6 +141,7 @@ class RetryMiddlewareDataIsNull(object):
             return retry_return
 
         if response.status == 302 and '/__x5__/query.htm' in str(response.headers.get('Location', '')):
+            spider.logger.info('origin_url: {}'.format(response.url))
             retry_return = _retry(self.max_retry_times, request, 'Data Is Null', spider)
             change_ip(request)
             return retry_return
