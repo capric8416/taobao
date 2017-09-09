@@ -135,7 +135,6 @@ class ProxyPool(object):
 
                 now = datetime.datetime.now().timestamp()
                 if ip_port['last_time'] >= int(now) + self.advance_time and ip_port['ip'] not in self.__blacklist:
-                    print(json.dumps(ip_port))
                     tmp_ip = "{0}:{1}".format(ip_port['ip'], ip_port['port'])
                     return tmp_ip
                 else:

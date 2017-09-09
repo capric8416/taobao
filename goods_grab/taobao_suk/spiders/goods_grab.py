@@ -38,7 +38,7 @@ class GoodsGrab(RedisSpider):
                          # 'referer': 'https://item.taobao.com/item.htm?spm=a219r.lm5644.14.11.70b3a555eCfx0A&id=541986659658&ns=1&abbucket=18',
                          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.115 Safari/537.36'}
 
-            yield scrapy.Request(url_, callback=self.get_sell, meta={'data': goods_info}, headers=headers)
+            yield scrapy.Request(url_, callback=self.get_sell, meta={'data': goods_info}, headers=headers, priority=10)
 
         elif 'tmall' in response.url:
             # 天猫
