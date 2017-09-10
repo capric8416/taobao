@@ -27,6 +27,9 @@ class TaobaoSukPipeline(object):
     def __init__(self, mongo_uri, mongo_db):
         self.mongo_uri = mongo_uri
         self.mongo_db = mongo_db
+        redis_url = os.environ.get('REDIS_URL', None)
+        pool = redis.ConnectionPool.from_url(redis_url)
+        self.rds = redis.StrictRedis(connection_pool=pool)
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -45,15 +48,13 @@ class TaobaoSukPipeline(object):
             for v_items in v:
                 self.db[k].ensure_index(v_items)
 
-        redis_url = os.environ.get('REDIS_URL', None)
-        pool = redis.ConnectionPool.from_url(redis_url)
-        rds = redis.StrictRedis(connection_pool=pool)
+
         REDIS_KEY_DUMMY_SHOP_URLS = 'dummy_goods_grab:start_urls'
         REDIS_KEY_SHOP_URLS = 'goods_grab:start_urls'
-        if rds.scard(REDIS_KEY_DUMMY_SHOP_URLS) == 0:
-            values = list(rds.smembers(REDIS_KEY_SHOP_URLS))
+        if self.rds.scard(REDIS_KEY_DUMMY_SHOP_URLS) == 0:
+            values = list(self.rds.smembers(REDIS_KEY_SHOP_URLS))
             for i in range(0, len(values), 100):
-                rds.sadd(REDIS_KEY_DUMMY_SHOP_URLS, *values[i: i + 100])
+                self.rds.sadd(REDIS_KEY_DUMMY_SHOP_URLS, *values[i: i + 100])
 
     def process_item(self, item, spider):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id
@@ -92,5 +93,6 @@ class TaobaoSukPipeline(object):
                          'date': self.date,
                          'count': num}
         self.db['goods_info_log'].insert(shop_info_log)
+        self.rds.delete('goods_grab:dupefilter')
         self.client.close()
 
