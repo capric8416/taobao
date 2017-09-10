@@ -24,6 +24,7 @@ class TaobaoSpider(scrapy.Spider):
         # check grab_goods_over
         flag = self.rds.exists('running_task_goods_list')
         if flag:
+            self.logger.debug("running_task_goods_list".center(50, '*'))
             return
 
         base_url = 'https://shopsearch.taobao.com/search?app=shopsearch&q={}&sort=sale-desc'

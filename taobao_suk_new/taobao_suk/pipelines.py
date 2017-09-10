@@ -68,6 +68,7 @@ class TaobaoSukPipeline(object):
         except DuplicateKeyError:
             spider.logger.debug(' duplicate key error collection')
         except:
+            spider.logger.error(item)
             spider.logger.error(format_exc())
 
         return item
