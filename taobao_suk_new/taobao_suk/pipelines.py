@@ -55,13 +55,13 @@ class TaobaoSukPipeline(object):
             # self.db[self.collection_name].insert(dict_item)
             for k, v in dict_item.items():
                 self.db[k].insert(v)
-
                 md_5 = hashlib.md5()
                 unique_list = ('shop_id', 'keyword')
                 unique_str = ''.join([str(v[unique_k]) for unique_k in unique_list])
                 md_5.update(unique_str.encode("utf-8"))
                 unique_id = md_5.hexdigest()
                 v['unique_id'] = unique_id
+                del v['_id']
                 self.db['shop_info_master'].update({'unique_id': v['unique_id']}, v, upsert=True)
 
             spider.logger.debug(dict_item)
