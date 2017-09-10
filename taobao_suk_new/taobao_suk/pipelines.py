@@ -17,6 +17,7 @@ class TaobaoSukPipeline(object):
     collection_name_list = \
         {
               'shop_info': ('date',),
+              'shop_info_master': ('shop_id', 'keyword'),
          }
 
     def __init__(self, mongo_uri, mongo_db):
@@ -36,10 +37,16 @@ class TaobaoSukPipeline(object):
         self.start_time = datetime.now()
         self.date = datetime.fromordinal(datetime.today().toordinal())
 
+        # for k, v in self.collection_name_list.items():
+        #     for v_items in v:
+        #         self.db[k].ensure_index(v_items)
+        # self.db['shop_info_master'].ensure_index('shop_id', unique=True)
+
         for k, v in self.collection_name_list.items():
-            for v_items in v:
-                self.db[k].ensure_index(v_items)
-        self.db['shop_info_master'].ensure_index('shop_id', unique=True)
+            if len(v) == 1:
+                self.db[k].ensure_index(v[0])
+            else:
+                self.db[k].ensure_index('unique_id', unique=True)
 
     def process_item(self, item, spider):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id

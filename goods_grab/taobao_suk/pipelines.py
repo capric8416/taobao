@@ -17,6 +17,7 @@ class TaobaoSukPipeline(object):
     collection_name_list = \
         {
               'goods_info': ('goods_id', 'modified', 'date'),
+              'daily_master': ('goods_id', 'modified', 'date'),
          }
 
     unique_index = 'pag_id'
@@ -41,30 +42,31 @@ class TaobaoSukPipeline(object):
         for k, v in self.collection_name_list.items():
             for v_items in v:
                 self.db[k].ensure_index(v_items)
+
     def process_item(self, item, spider):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id
         try:
             dict_item = dict(item['detail'])
-            # goods_info_ = dict_item['goods_info']
-            # query_item_today = \
-            #     self.db['goods_list'].find_one({'id': goods_info_['goods_id'], 'date': goods_info_['date']})
-            # spider.logger.debug('query_item_today: {}'.format(query_item_today))
-            # date = datetime.today() - timedelta(days=1)
-            # date = date.toordinal()
-            # date = datetime.fromordinal(date)
-            # query_item = self.db['goods_list'].find_one({'id': goods_info_['goods_id'], 'date': date})
-            #
-            # if query_item:
-            #     quantity = query_item.get('quantity', 0)
-            # else:
-            #     quantity = 0
-            #
-            # dict_item['goods_info']['Daily_Sales'] = query_item_today.get('quantity', 0) - quantity
-            #
             for k, v in dict_item.items():
                 self.db[k].insert(v)
-
             spider.logger.debug(dict_item)
+
+            goods_info_ = dict_item['goods_info']
+            totalQuantity_today = goods_info_['totalQuantity']
+            date = datetime.today() - timedelta(days=1)
+            date = date.toordinal()
+            date = datetime.fromordinal(date)
+            query_item = self.db['goods_info'].find_one({'goods_id': goods_info_['goods_id'], 'date': date})
+
+            if query_item:
+                quantity = query_item.get('totalQuantity', totalQuantity_today)
+            else:
+                quantity = totalQuantity_today
+
+            dict_item['goods_info']['Daily_Sales'] = quantity - totalQuantity_today
+            self.db['daily_master'].insert(dict_item['goods_info'])
+            spider.logger.debug(dict_item['goods_info'])
+
         except DuplicateKeyError:
             spider.logger.debug(' duplicate key error collection')
         except:
