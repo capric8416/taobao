@@ -137,7 +137,7 @@ class GoodsGrab(RedisSpider):
         try:
             item['goods_id'] = int(re.search(r'id=(\d*)', response.url).group(1))
         except Exception as e:
-            self.logger.error('tianmao get goods id error,{}:{}'.format(response.url, error))
+            self.logger.error('tianmao get goods id error,{}:{}'.format(response.url, e))
 
         products = ''.join(tree.xpath('//div[@class="mui-standardItemProps mdv-standardItemProps"]/@mdv-cfg'))
         try:
@@ -169,8 +169,8 @@ class GoodsGrab(RedisSpider):
         item['sell_count'] = int(self.regular_expression_match(r'"sellCount":(\d*?)\,', text, 0))  # 销量
         item['deliveryAddress'] = self.regular_expression_match(r'"deliveryAddress":(.*?),', text, '')
 
-        item['rate_counts'] = self.regular_expression_match(r'"commentCount":(\d+?),', text, 0) # 累计评价
-        item['totalQuantity'] = self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, 0) # 库存
+        item['rate_counts'] = self.regular_expression_match(r'"commentCount":(\d+?),', text, 0)  # 累计评价
+        item['totalQuantity'] = int(self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, '0'))  # 库存
 
         text = tree.xpath('//script[contains(text(), "_DATA_Mdskip")]/text()')
         text = text[0] if text else '{}'

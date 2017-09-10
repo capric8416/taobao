@@ -76,7 +76,7 @@ class TaobaoSukPipeline(object):
             else:
                 quantity = totalQuantity_today
 
-            dict_item['goods_info']['Daily_Sales'] = quantity - totalQuantity_today
+            dict_item['goods_info']['Daily_Sales'] = int(quantity) - int(totalQuantity_today)
             self.db['daily_master'].insert(dict_item['goods_info'])
             spider.logger.debug(dict_item['goods_info'])
 
