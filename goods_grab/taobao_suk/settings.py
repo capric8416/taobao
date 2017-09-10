@@ -9,6 +9,7 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 import os
+import scrapy.core.downloader.middleware
 BOT_NAME = 'taobao_suk'
 
 SPIDER_MODULES = ['taobao_suk.spiders']
