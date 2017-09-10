@@ -11,7 +11,7 @@ from scrapy_redis.spiders import RedisSpider
 
 class GoodsGrab(RedisSpider):
     name = "goods_grab"
-    redis_key = 'goods_grab:start_urls'
+    redis_key = 'dummy_goods_grab:start_urls'
     allowed_domains = ["taobao.com", "tmall.hk", "tmall.com"]
 
     custom_settings = {

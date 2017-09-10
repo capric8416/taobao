@@ -93,7 +93,7 @@ MONGODB_DATABASE = os.environ.get('MONGODB_DATABASE', 'test')
 # retry #
 RETRY_ENABLED = True
 # RETRY_HTTP_CODES = [302, 301]
-RETRY_TIMES = 10
+RETRY_TIMES = 100
 
 
 # Enable and configure the AutoThrottle extension (disabled by default)
