@@ -17,7 +17,7 @@ class TaobaoSukPipeline(object):
     collection_name_list = \
         {
               'shop_info': ('date',),
-              'shop_info_master': ('shop_id', 'keyword'),
+              # 'shop_info_master': ('shop_id', 'keyword'),
          }
 
     def __init__(self, mongo_uri, mongo_db):
@@ -37,16 +37,16 @@ class TaobaoSukPipeline(object):
         self.start_time = datetime.now()
         self.date = datetime.fromordinal(datetime.today().toordinal())
 
-        # for k, v in self.collection_name_list.items():
-        #     for v_items in v:
-        #         self.db[k].ensure_index(v_items)
-        # self.db['shop_info_master'].ensure_index('shop_id', unique=True)
-
         for k, v in self.collection_name_list.items():
-            if len(v) == 1:
-                self.db[k].ensure_index(v[0])
-            else:
-                self.db[k].ensure_index('unique_id', unique=True)
+            for v_items in v:
+                self.db[k].ensure_index(v_items)
+        self.db['shop_info_master'].ensure_index('unique_id', unique=True)
+
+        # for k, v in self.collection_name_list.items():
+        #     if len(v) == 1:
+        #         self.db[k].ensure_index(v[0])
+        #     else:
+        #         self.db[k].ensure_index('unique_id', unique=True)
 
     def process_item(self, item, spider):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id
@@ -56,6 +56,14 @@ class TaobaoSukPipeline(object):
             for k, v in dict_item.items():
                 self.db['shop_info_master'].update({'shop_id': v['shop_id']}, v, upsert=True)
                 self.db[k].insert(v)
+
+                md_5 = hashlib.md5()
+                unique_list = ('shop_id', 'keyword')
+                unique_str = ''.join([v[unique_k] for unique_k in unique_list])
+                md_5.update(unique_str.encode("utf-8"))
+                unique_id = md_5.hexdigest()
+                v['unique_id'] = unique_id
+                self.db['shop_info_master'].update({'unique_id': v['unique_id']}, v, upsert=True)
 
             spider.logger.debug(dict_item)
         except DuplicateKeyError:
