@@ -6,6 +6,8 @@
 # http://doc.scrapy.org/en/latest/topics/spider-middleware.html
 from scrapy.utils.gz import gunzip, is_gzipped
 from scrapy.exceptions import IgnoreRequest
+from scrapy.downloadermiddlewares.retry import RetryMiddleware
+from scrapy.utils.response import response_status_message
 from scrapy import signals
 from .ProxySwift import proxy_pool
 import logging
@@ -15,6 +17,39 @@ proxy_pool.blacklist_clean_timing = 60*60*24
 proxy_pool.redis_url = ''
 proxy_pool.start()
 logger = logging.getLogger(__name__)
+
+
+class CustomRetryMiddleware(RetryMiddleware):
+    def __init__(self, settings):
+        super(CustomRetryMiddleware, self).__init__(settings)
+
+    def process_response(self, request, response, spider):
+        if request.meta.get('dont_retry', False):
+            return response
+
+        if response.status in self.retry_http_codes:
+            ip = request.meta['proxy']
+            try:
+                proxy_pool.change_ip(ip)
+                spider.logger.info('=========change ip: {}'.format(ip))
+            except Exception as e:
+                spider.logger.info('=========change ip Exception: {}'.format(e))
+            reason = response_status_message(response.status)
+            return self._retry(request, reason, spider) or response
+        return response
+
+    def process_exception(self, request, exception, spider):
+        if isinstance(exception, self.EXCEPTIONS_TO_RETRY) \
+                and not request.meta.get('dont_retry', False):
+
+            ip = request.meta['proxy']
+            try:
+                proxy_pool.change_ip(ip)
+                spider.logger.info('=========change ip: {}'.format(ip))
+            except Exception as e:
+                spider.logger.info('=========change ip Exception: {}'.format(e))
+
+            return self._retry(request, exception, spider)
 
 
 class ProxyMiddleware(object):
