@@ -64,7 +64,7 @@ class TaobaoSpider(scrapy.Spider):
         quanqiugou_url = 'https://shopsearch.taobao.com/search?app=shopsearch&q={}&ie=utf8&shop_type=2&isb=&ratesum='
 
         for w in world_list:
-            yield scrapy.Request(quanqiugou_url.format(w), callback=self.parse, meta={'word': w, 'shop_type': ''})
+            yield scrapy.Request(quanqiugou_url.format(w), callback=self.parse, meta={'word': w, 'shop_type': '淘宝'})
 
         for w in itertools.product(world_list, addrs_list, shop_type, xing_ji):
             url_ = base_url + addrs_url + shop_type_url + xing_ji_url

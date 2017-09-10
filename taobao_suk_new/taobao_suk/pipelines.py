@@ -58,7 +58,7 @@ class TaobaoSukPipeline(object):
 
                 md_5 = hashlib.md5()
                 unique_list = ('shop_id', 'keyword')
-                unique_str = ''.join([v[unique_k] for unique_k in unique_list])
+                unique_str = ''.join([str(v[unique_k]) for unique_k in unique_list])
                 md_5.update(unique_str.encode("utf-8"))
                 unique_id = md_5.hexdigest()
                 v['unique_id'] = unique_id
