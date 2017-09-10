@@ -54,7 +54,6 @@ class TaobaoSukPipeline(object):
             dict_item = dict(item['detail'])
             # self.db[self.collection_name].insert(dict_item)
             for k, v in dict_item.items():
-                self.db['shop_info_master'].update({'shop_id': v['shop_id']}, v, upsert=True)
                 self.db[k].insert(v)
 
                 md_5 = hashlib.md5()
