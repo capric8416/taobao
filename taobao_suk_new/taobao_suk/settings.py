@@ -55,6 +55,7 @@ DOWNLOAD_TIMEOUT = 5
 # See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
     'taobao_suk.middlewares.ProxyMiddleware': 100,
+    'taobao_suk.middlewares.CustomRetryMiddleware': 800,
     'taobao_suk.middlewares.RetryMiddlewareDataIsNull': 860,
 }
 
