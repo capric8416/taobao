@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 # !/usr/bin/env python
 
-from proxy_swift import *
-
-from datetime import datetime
 import inspect
 import json
 import logging
@@ -14,17 +11,16 @@ import re
 import signal
 import time
 import urllib.parse
+from datetime import datetime
 
 import fire
-
 import pymongo
-from pyvirtualdisplay import Display
-
 import redis
-
+from proxy_swift import *
+from pyvirtualdisplay import Display
 from selenium import webdriver
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -308,6 +304,31 @@ class GetGoods(object):
 
         return pages
 
+    def dump_main_goods(self, date=datetime.fromordinal(datetime.today().toordinal()), limit=3000):
+        self.logger.info('{0} {1} {0}'.format('=' * 40, datetime.now()))
+
+        self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].create_index([
+            ('id', pymongo.ASCENDING), ('shop_id', pymongo.ASCENDING), ('keyword', pymongo.ASCENDING)
+        ])
+
+        for keyword in self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS].find({'date': {'$gte': date}}).distinct('keyword'):
+            self.logger.info('{0} {1}'.format(datetime.now(), keyword))
+
+            goods_list = list(self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS].find(
+                {'date': date, 'keyword': keyword}).sort([('sales_volume', pymongo.DESCENDING)]).limit(limit=limit))
+
+            for i in range(0, len(goods_list), 100):
+                items = goods_list[i: i + 100]
+                self.redis.sadd(REDIS_KEY_GOODS_URLS, *[item['url'] for item in items])
+                self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].delete_many({
+                    'id': {'$in': [item['id'] for item in items]}
+                })
+                self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].insert_many(items)
+
+            self.logger.info('{0} {1}'.format(datetime.now(), len(goods_list)))
+
+        self.logger.info('{0} {1} {0}'.format('=' * 40, datetime.now()))
+
     def run(self):
         self.logger.info('-' * 100)
 
@@ -333,6 +354,8 @@ class GetGoods(object):
                         'start': start, 'end': end, 'date': today, 'count': count
                     })
                     self.logger.info('{0} {1} -> {2} = {3} {0}'.format('=' * 40, start, end, count))
+
+                    self.dump_main_goods(date=start)
 
                 break
 
@@ -374,9 +397,9 @@ class GetGoods(object):
 
 class TaskDispatcher(object):
     def __init__(
-        self, max_pages, enable_proxy=True, log_dir='~/data/logs/taobao/goods_list/',
-        redis_url=os.environ.get('REDIS_URL') or 'redis://localhost:6379/1',
-        mongo_url=os.environ.get('MONGO_URL') or 'mongodb://localhost:27017/'
+            self, max_pages, enable_proxy=True, log_dir='~/data/logs/taobao/goods_list/',
+            redis_url=os.environ.get('REDIS_URL') or 'redis://localhost:6379/1',
+            mongo_url=os.environ.get('MONGO_URL') or 'mongodb://localhost:27017/'
     ):
         self.max_pages = max_pages
         self.enable_proxy = enable_proxy
@@ -397,31 +420,6 @@ class TaskDispatcher(object):
             redis_url=self.redis_url, mongo_url=self.mongo_url, log_dir=self.log_dir
         )
         fetcher.run()
-
-    def sort_goods(self, date=datetime.fromordinal(datetime.today().toordinal()), limit=3000):
-        self.logger.info('{0} {1} {0}'.format('=' * 40, datetime.now()))
-
-        self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].create_index([
-            ('id', pymongo.ASCENDING), ('shop_id', pymongo.ASCENDING), ('keyword', pymongo.ASCENDING)
-        ])
-
-        for keyword in self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS].find({'date': date}).distinct('keyword'):
-            self.logger.info('{0} {1}'.format(datetime.now(), keyword))
-
-            goods_list = list(self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS].find(
-                {'date': date, 'keyword': keyword}).sort([('sales_volume', pymongo.DESCENDING)]).limit(limit=limit))
-
-            for i in range(0, len(goods_list), 100):
-                items = goods_list[i: i + 100]
-                self.redis.sadd(REDIS_KEY_GOODS_URLS, *[item['url'] for item in items])
-                self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].delete_many({
-                    'id': {'$in': [item['id'] for item in items]}
-                })
-                self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].insert_many(items)
-
-            self.logger.info('{0} {1}'.format(datetime.now(), len(goods_list)))
-
-        self.logger.info('{0} {1} {0}'.format('=' * 40, datetime.now()))
 
     def run(self):
         if self.redis.exists(REDIS_KEY_DUMMY_GOODS_URLS):
@@ -456,8 +454,6 @@ class TaskDispatcher(object):
                 break
 
             time.sleep(0.1)
-
-        self.sort_goods()
 
 
 if __name__ == '__main__':
