@@ -31,6 +31,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 REDIS_KEY_SHOP_URLS = 'shop_urls'
 REDIS_KEY_DUMMY_SHOP_URLS = 'dummy_shop_urls'
 REDIS_KEY_GOODS_URLS = 'goods_grab:start_urls'
+REDIS_KEY_DUMMY_GOODS_URLS = 'dummy_goods_grab:start_urls'
 REDIS_KEY_TASK_RUNNING = 'running_task_goods_list'
 
 MONGO_DB = 'test'
@@ -400,7 +401,6 @@ class TaskDispatcher(object):
     def sort_goods(self, date=datetime.fromordinal(datetime.today().toordinal()), limit=3000):
         self.logger.info('{0} {1} {0}'.format('=' * 40, datetime.now()))
 
-        self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].drop()
         self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].create_index([
             ('id', pymongo.ASCENDING), ('shop_id', pymongo.ASCENDING), ('keyword', pymongo.ASCENDING)
         ])
@@ -414,6 +414,9 @@ class TaskDispatcher(object):
             for i in range(0, len(goods_list), 100):
                 items = goods_list[i: i + 100]
                 self.redis.sadd(REDIS_KEY_GOODS_URLS, *[item['url'] for item in items])
+                self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].delete_many({
+                    'id': {'$in': [item['id'] for item in items]}
+                })
                 self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].insert_many(items)
 
             self.logger.info('{0} {1}'.format(datetime.now(), len(goods_list)))
@@ -421,6 +424,9 @@ class TaskDispatcher(object):
         self.logger.info('{0} {1} {0}'.format('=' * 40, datetime.now()))
 
     def run(self):
+        if self.redis.exists(REDIS_KEY_DUMMY_GOODS_URLS):
+            return
+
         if self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].find_one(
                 {'date': datetime.fromordinal(datetime.today().toordinal())}):
             return

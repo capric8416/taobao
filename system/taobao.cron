@@ -11,10 +11,10 @@ PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
 0 * * * * /usr/bin/task_empty_tmp &>/root/data/logs/taobao/cron_tasks/empty_tmp.log
 
 # shop_list spider
-30 23 * * * /usr/bin/task_shop_list &>/root/data/logs/taobao/cron_tasks/shop_list.log
+0 23 * * * /usr/bin/task_shop_list &>/root/data/logs/taobao/cron_tasks/shop_list.log
 
 # goods_list spider
 0 0 * * * /usr/bin/task_goods_list &>/root/data/logs/taobao/cron_tasks/goods_list.log
 
 # goods_detail spider
-0 7 * * * /usr/bin/task_goods_detail &>/root/data/logs/taobao/cron_tasks/goods_detail.log
+0 3 * * * /usr/bin/task_goods_detail &>/root/data/logs/taobao/cron_tasks/goods_detail.log
