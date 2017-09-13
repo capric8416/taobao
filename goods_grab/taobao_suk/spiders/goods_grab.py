@@ -82,7 +82,7 @@ class GoodsGrab(RedisSpider):
               "Price,tradeContract"
 
         goods_id = re.search(r'id=(\d*)', response.url).group(1)
-        result['goods_id'] = goods_id
+        result['goods_id'] = int(goods_id)
         url_ = url.format(goods_id)
 
         return url_, result
@@ -121,7 +121,16 @@ class GoodsGrab(RedisSpider):
         }
         tree = lxml.etree.HTML(response.text)
 
-        item = {}
+        item = {'category': '',
+                'goods_name': '',
+                'color_type': '',
+                'rule_type': '',
+                'is_special': '',
+                'use_date_range': '',
+                'net_content': '',
+                'single_product': ''}
+        # category  goods_name color_type rule_type is_special use_date_range net_content single_product
+
         for key in xpath_item:
             item[key] = ''.join(tree.xpath(xpath_item[key])).replace('\n', '').strip()
 
@@ -161,7 +170,6 @@ class GoodsGrab(RedisSpider):
         if not props:
             for k, v in key_item.items():
                 item[v] = ''
-	        
 
         text = response.text
 
