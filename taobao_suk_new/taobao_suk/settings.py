@@ -75,9 +75,9 @@ ITEM_PIPELINES = {
 }
 
 import os
-MONGODB_HOST = os.environ.get('MONGODB_HOST', '10.0.54.54')
+MONGODB_HOST = os.environ.get('MONGODB_HOST', '10.10.10.51')
 MONGODB_PORT = os.environ.get('MONGODB_PORT', '27017')
-MONGODB_URI = os.environ.get('MONGO_URL')
+MONGODB_URI = os.environ.get('MONGO_URL', 'mongodb://10.10.10.51:27017')
 MONGODB_DATABASE = os.environ.get('MONGODB_DATABASE', 'test')
 
 # Enable and configure the AutoThrottle extension (disabled by default)

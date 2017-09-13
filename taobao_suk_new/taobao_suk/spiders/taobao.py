@@ -15,17 +15,17 @@ class TaobaoSpider(scrapy.Spider):
     allowed_domains = ["taobao.com", "tmall.hk", "tmall.com"]
     start_urls = ['http://taobao.com/']
 
-    redis_url = os.environ.get('REDIS_URL', None) or 'redis://10.0.54.54:6378'
+    redis_url = os.environ.get('REDIS_URL', None) or 'redis://10.10.10.51:6378'
     pool = redis.ConnectionPool.from_url(redis_url)
     rds = redis.StrictRedis(connection_pool=pool)
 
     def start_requests(self):
 
         # check grab_goods_over
-        flag = self.rds.exists('running_task_goods_list')
-        if flag:
-            self.logger.debug("running_task_goods_list".center(50, '*'))
-            return
+        # flag = self.rds.exists('running_task_goods_list')
+        # if flag:
+        #     self.logger.debug("running_task_goods_list".center(50, '*'))
+        #     return
 
         base_url = 'https://shopsearch.taobao.com/search?app=shopsearch&q={}&sort=sale-desc'
         # world_list = ['papa recipe']
