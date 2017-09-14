@@ -1,468 +1,455 @@
 # -*- coding: utf-8 -*-
 # !/usr/bin/env python
 
-import inspect
+import asyncio
+import copy
+import hashlib
 import json
-import logging
-import logging.handlers
-import multiprocessing
+import math
 import os
 import re
-import signal
+import sys
 import time
-import urllib.parse
 from datetime import datetime
+from urllib import parse
 
-import fire
-import pymongo
-import redis
-from proxy_swift import *
-from pyvirtualdisplay import Display
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-from selenium.webdriver.support import expected_conditions
-from selenium.webdriver.support.ui import WebDriverWait
+import aiohttp
+import aioredis
+import motor.motor_asyncio
+from pyquery import PyQuery
+from proxy_swift import get_logger
+
+
+DEBUG = True if '--debug' in sys.argv else False
+
+PREFIX = '' if not DEBUG else 'Q1H4siXpVa_'
+
+STEP = 100
+
+TAOBAO_ERROR_URL = 'err.taobao.com'
+
+DATE_TIME_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
+
+REDIS_KEY_USER_AGENTS = PREFIX + 'user_agents'
 
 REDIS_KEY_SHOP_URLS = 'shop_urls'
-REDIS_KEY_DUMMY_SHOP_URLS = 'dummy_shop_urls'
-REDIS_KEY_GOODS_URLS = 'goods_grab:start_urls'
-REDIS_KEY_DUMMY_GOODS_URLS = 'dummy_goods_grab:start_urls'
-REDIS_KEY_TASK_RUNNING = 'running_task_goods_list'
+REDIS_KEY_DUMMY_SHOP_URLS = PREFIX + 'dummy_shop_urls'
+REDIS_KEY_GOODS_URLS = PREFIX + 'goods_grab:start_urls'
+REDIS_KEY_TASK_RUNNING = PREFIX + 'running_task_goods_list'
 
-MONGO_DB = 'test'
+MONGO_DB = PREFIX + 'test'
 MONGO_COLLECTION_GOODS = 'goods_list'
 MONGO_COLLECTION_GOODS_MAIN = 'goods_list_main'
 MONGO_COLLECTION_GOODS_LOG = 'goods_list_logs'
 
-DATE_TIME_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
+
+class GetShopItemList(aiohttp.ClientSession):
+    def __init__(self, delay=3, timeout=15, user_agent='', proxy=None):
+        super(GetShopItemList, self).__init__()
+
+        self.logger = get_logger(__name__)
+
+        self.delay = delay
+        self.timeout = timeout
+        self.proxy = proxy
+        self.user_agent = user_agent or 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 ' \
+                                        '(KHTML, like Gecko) Chrome/61.0.3163.39 Safari/537.36'
+
+        self.tmall = 'tmall'
+        self.taobao = 'taobao'
+
+        self.search_url = ''
+        self.search_keyword = ''
+
+        self.host_error_taobao = 'err.taobao.com'
+
+        self.params = {
+            self.tmall: {
+                'q': '',
+                'p': None,
+                'ajson': 1,
+                'sort': 'd',
+                'from': 'h5',
+                'shop_id': None,
+                'page_size': None,
+                '_input_charset': 'utf-8',
+                '_tm_source': 'tmallsearch',
+                'callback': 'jsonp_23748483'
+            },
+            self.taobao: {
+                't': '',
+                'v': '2.0',
+                'data': '',
+                '_m_h5_tk': '',
+                'type': 'jsonp',
+                'dataType': 'jsonp',
+                'appKey': '12574478',
+                'callback': 'mtopjsonp1',
+                'api': 'com.taobao.search.api.getShopItemList'
+            }
+        }
+
+    async def search(self, shop_id, query):
+        self.search_keyword = query
+
+        resp = await self._open(shop_id=shop_id, query=query)
+        if resp.url.host == self.host_error_taobao:
+            raise asyncio.TimeoutError('访问受限')
+
+        results = []
+
+        data = {}
+        if resp.url.host.endswith('.tmall.com'):
+            shop_type = self.tmall
+            self.search_url = f'https://{resp.url.host}/shop/shop_auction_search.htm' \
+                              f'?q={query}&_input_charset=utf-8&sort=d'
+
+            text = await self._search(hostname=resp.url.host, shop_id=shop_id, shop_type=shop_type, query=query)
+            data = self._json(text=text, callback=self.params[shop_type]['callback'])
+            results.append(data)
+
+            total_page = int(data['total_page'])
+            if total_page:
+                for page in range(2, total_page + 1):
+                    await asyncio.sleep(self.delay)
+
+                    text = await self._search(
+                        hostname=resp.url.host, shop_id=shop_id, shop_type=shop_type, query=query, page=page)
+                    data = self._json(text=text, callback=self.params[shop_type]['callback'])
+                    results.append(data)
+        else:
+            shop_type = self.taobao
+            for _ in range(10):
+                text = await self._search(hostname='', shop_id=shop_id, shop_type=shop_type, query=query)
+                data = self._json(text=text, callback=self.params[shop_type]['callback'])
+                if data['ret'] == ['SUCCESS::调用成功']:
+                    break
+                elif data['ret'] == ['RGV587_ERROR::SM']:
+                    raise asyncio.TimeoutError('要求登录')
+
+            if not data:
+                raise asyncio.TimeoutError('调用接口失败')
+
+            results.append(data)
+
+            total_results = int(data['data']['totalResults'])
+            if total_results:
+                page_size = int(data['data']['pageSize'])
+                pages = int(math.ceil(total_results / page_size))
+                for page in range(2, pages + 1):
+                    await asyncio.sleep(self.delay)
+
+                    text = await self._search(hostname='', shop_id=shop_id, shop_type=shop_type, query=query, page=page)
+                    data = self._json(text=text, callback=self.params[shop_type]['callback'])
+                    results.append(data)
+
+        now = datetime.now()
+        return self._extract(shop_type=shop_type, now=now, today=now.today(), results=results)
+
+    async def _open(self, shop_id, query):
+        url = f'http://shop.m.taobao.com/shop/shop_index.htm?shop_id={shop_id}#list?q={parse.quote(query)}'
+        self.search_url = url
+
+        resp = await self._request_data(url=url, headers={'User-Agent': self.user_agent})
+        return resp
+
+    async def _search(self, shop_id, shop_type, hostname, query, page=1):
+        if shop_type == self.taobao:
+            self.params[shop_type].update({
+                't': self._timestamp(),
+                '_m_h5_tk': self._token(),
+                'data': f'{{"shopId": "{shop_id}", "currentPage": {page}, '
+                        f'"pageSize": 30, "q": "{query}", "sort": "hotsell"}}'
+            })
+            self.params[shop_type]['sign'] = self._sign()
+
+            return await self._request_data(
+                url='https://api.m.taobao.com/h5/com.taobao.search.api.getshopitemlist/2.0/',
+                params=self.params[shop_type], as_text=True,
+                headers={'Referer': f'http://shop.m.taobao.com/shop/shop_index.htm?shop_id={shop_id}',
+                         'User-Agent': self.user_agent}
+            )
+        else:
+            url = f'https://{hostname}/shop/shop_auction_search.do'
+            self.params[shop_type].update({
+                'p': page,
+                'q': query,
+                'page_size': 24,
+                'shop_id': shop_id,
+            })
+
+            return await self._request_data(
+                url=url, params=self.params[shop_type], as_text=True,
+                headers={'Referer': f'https://{hostname}/shop/shop_auction_search.htm'
+                                    f'?q={parse.quote(query)}&_input_charset=utf-8&sort=d',
+                         'User-Agent': self.user_agent}
+            )
+
+    def _extract(self, shop_type, now, today, results):
+        goods_list = []
+
+        if shop_type == self.tmall:
+            for page in results:
+                for item in page.get('items', []):
+                    goods_url = 'https:' + item['url'] if item['url'].startswith('//') else item['url']
+                    goods_info = {
+                        'keyword': self.search_keyword,
+                        'search': self.search_url,
+                        'search_results': int(page['total_results']),
+                        'id': int(item['item_id']),
+                        'url': goods_url,
+                        'from': '天猫',
+                        'shop_id': int(page['shop_id']),
+                        'shop_title': page['shop_title'],
+                        'image': 'https:' + item['img'] if item['img'].startswith('//') else item['img'],
+                        'title': PyQuery(item['title']).text().strip(),
+                        'price_highlight': float(item['price']),
+                        'price_del': None,
+                        'sales': int(item['sold']),
+                        'sales_volume': int(item['totalSoldQuantity']),
+                        'quantity': int(item['quantity']),
+                        'raw': item,
+                        'date': datetime.fromordinal(today.toordinal()),
+                        'modified': now,
+                    }
+
+                    goods_list.append(goods_info)
+        else:
+            for page in results:
+                page = page['data']
+                for item in page.get('itemsArray', []):
+                    goods_url = 'https://item.taobao.com/item.htm?id=' + item['auctionId']
+                    goods_info = {
+                        'keyword': self.search_keyword,
+                        'search': self.search_url,
+                        'search_results': int(page['totalResults']),
+                        'id': int(item['auctionId']),
+                        'url': goods_url,
+                        'from': '淘宝',
+                        'shop_id': int(page['shopId']),
+                        'shop_title': page['shopTitle'],
+                        'image': 'https:' + item['picUrl'] if item['picUrl'].startswith('//') else item['picUrl'],
+                        'title': item['title'],
+                        'price_highlight': float(item['salePrice']),
+                        'price_del': float(item['reservePrice']) if item['reservePrice'] else None,
+                        'sales': int(item['sold']),
+                        'sales_volume': int(item['totalSoldQuantity']),
+                        'quantity': int(item['quantity']),
+                        'raw': item,
+                        'date': datetime.fromordinal(today.toordinal()),
+                        'modified': now,
+                    }
+
+                    goods_list.append(goods_info)
+
+        return goods_list
+
+    async def _request_data(self, *args, **kwargs):
+        as_text = kwargs.pop('as_text', False)
+        as_json = kwargs.pop('as_json', False)
+
+        kwargs = copy.deepcopy(kwargs)
+        kwargs['timeout'] = self.timeout
+        kwargs['proxy'] = self.proxy
+
+        async with self.get(*args, **kwargs) as resp:
+            if as_json:
+                return await resp.json()
+            elif as_text:
+                return await resp.text()
+            else:
+                return resp
+
+    def _timestamp(self, as_str=True):
+        _ = self
+
+        t = int(time.time())
+        return str(t) if as_str else t
+
+    def _token(self):
+        for cookie in self.cookie_jar:
+            if cookie.key == '_m_h5_tk':
+                return cookie.value.partition('_')[0]
+
+        return 'undefined'
+
+    def _sign(self):
+        return hashlib.md5('&'.join([
+            self.params[self.taobao]['_m_h5_tk'], self.params[self.taobao]['t'],
+            self.params[self.taobao]['appKey'], self.params[self.taobao]['data']
+        ]).encode()).hexdigest()
+
+    def _json(self, text, callback):
+        _ = self
+
+        result = re.search(r'%s\((.*)\)' % callback, text.strip())
+        if result and result.group(1):
+            return json.loads(result.group(1))
+
+        return {}
 
 
-def init_logger(name, task_id, log_dir):
-    _logger = logging.getLogger(name)
-    _logger.setLevel(logging.INFO)
+class Dispatcher(object):
+    def __init__(self, workers, shops_per_proxy, proxy_service_url='http://localhost:8080',
+                 redis_url=os.environ.get('REDIS_URL') or 'redis://localhost:6379',
+                 mongo_url=os.environ.get('MONGO_URL') or 'mongodb://localhost:27017/'):
+        self.logger = get_logger(__name__)
 
-    log_dir = os.path.expanduser(log_dir)
-    if not os.path.exists(log_dir) or not os.path.isdir(log_dir):
-        os.makedirs(log_dir, exist_ok=True)
+        self.workers = workers
+        self.shops_per_proxy = shops_per_proxy
 
-    file_handler = logging.handlers.TimedRotatingFileHandler(
-        filename=os.path.join(log_dir, f'{task_id}.log'), when='D', backupCount=30, encoding='utf-8'
-    )
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(
-        logging.Formatter('%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s')
-    )
+        self.proxy_service_url = proxy_service_url
+        self.redis_redis = redis_url
+        self.mongo_url = mongo_url
 
-    _logger.addHandler(file_handler)
+        self.redis_client = None
+        self.mongo_client = None
 
-    return _logger
+        self.user_agents = []
 
+        self.exceptions = (asyncio.TimeoutError, aiohttp.client_exceptions.ClientConnectorError,
+                           aiohttp.client_exceptions.ClientResponseError, aiohttp.client_exceptions.ClientOSError)
 
-class GracefullyExit(object):
-    received = False
+    async def start(self):
+        self._load_user_agents()
 
-    def __init__(self):
-        for _signal in (signal.SIGINT, signal.SIGTERM):
-            signal.signal(_signal, self.exit_gracefully)
+        await self._connect_storage()
+        await self._connect_proxy(full_restart=not DEBUG)
+        await self._check_shop_urls()
 
-    def exit_gracefully(self, signum, frame):
-        _ = signum
-        _ = frame
-        self.received = True
+        tasks = [self._check_user_agents(), self._report_progress()]
+        for identity in range(self.workers):
+            tasks.append(self.get_shop_item_list(identity=identity))
 
+        await asyncio.gather(*tasks)
 
-class GetGoods(object):
-    def __init__(self, task_id, max_pages, enable_proxy, redis_url, mongo_url, log_dir):
-        self.task_id = task_id
-        self.max_pages = max_pages
-        self.enable_proxy = enable_proxy
+    async def get_shop_item_list(self, identity):
+        async with aiohttp.ClientSession() as session:
+            mongo_client, redis_client = await self._connect_storage()
+            while True:
+                proxy = await self._get_proxy(session=session)
+                if not proxy:
+                    await asyncio.sleep(1)
+                    continue
 
-        self.redis = redis.from_url(redis_url)
+                for _ in range(self.shops_per_proxy):
+                    user_agent = await self._get_user_agent(redis_client=redis_client)
+                    if not user_agent:
+                        await asyncio.sleep(1)
+                        continue
 
-        self.mongo = pymongo.MongoClient(mongo_url)
-        self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS].create_index([
-            ('id', pymongo.ASCENDING), ('keyword', pymongo.ASCENDING),
-            ('date', pymongo.DESCENDING), ('shop_id', pymongo.ASCENDING)
-        ])
-        self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_LOG].create_index([('date', pymongo.DESCENDING)])
+                    shop_info, shop_id, query = await self._pop_shop_info(redis_client=redis_client)
+                    if not all([shop_id, query]):
+                        return
 
-        self.proxy_swift = ProxySwift(secret_key='Kg6t55fc39FQRJuh92BwZBMXyK3sWFkJ', partner_id='2017072514450843')
+                    async with GetShopItemList(user_agent=user_agent, proxy=proxy) as client:
+                        dt1 = datetime.now()
 
-        self.logger = init_logger(name=self.__class__.__name__, task_id=self.task_id, log_dir=log_dir)
+                        try:
+                            goods_list = await client.search(shop_id=int(shop_id), query=query)
+                        except self.exceptions as e:
+                            self.logger.exception(e)
+                            goods_list = []
+                            await self._add_shop_info(redis_client=redis_client, shop_info=shop_info)
+                        else:
+                            await self._insert_goods_list(mongo_client=mongo_client, goods_list=goods_list)
+                        finally:
+                            dt2 = datetime.now()
+                            print(identity, (dt2 - dt1).total_seconds(), shop_id, query, proxy, goods_list)
 
-        self.display = Display(visible=0, size=(800, 600))
-        self.browser = self.open_browser()
+    async def _connect_storage(self):
+        mongo_client = motor.motor_asyncio.AsyncIOMotorClient(self.mongo_url)
 
-    def reset_proxy(self):
-        self.logger.info('proxy.{}: launching'.format(self.task_id))
+        _ = parse.urlparse(url=self.redis_redis)
+        redis_client = await aioredis.create_redis(address=(_.hostname, _.port), password=_.password)
 
-        proxy = 'http://{ip}:{port}'.format(**self.proxy_swift.change_ip(interface_id=self.task_id, pool_id=3))
-        self.logger.info('proxy.{}: {}'.format(self.task_id, proxy))
+        if not self.mongo_client:
+            self.mongo_client = mongo_client
+
+        if not self.redis_client:
+            self.redis_client = redis_client
+
+        return mongo_client, redis_client
+
+    async def _check_shop_urls(self):
+        if not await self.redis_client.exists(REDIS_KEY_DUMMY_SHOP_URLS):
+            values = list(await self.redis_client.smembers(REDIS_KEY_SHOP_URLS))
+            for i in range(0, len(values), STEP):
+                await self.redis_client.sadd(REDIS_KEY_DUMMY_SHOP_URLS, *values[i: i + STEP])
+
+    def _load_user_agents(self):
+        if not self.user_agents:
+            with open('user_agents.txt', encoding='utf-8') as fp:
+                self.user_agents = [line.strip() for line in fp]
+
+    async def _check_user_agents(self):
+        while True:
+            if await self.redis_client.scard(REDIS_KEY_USER_AGENTS) <= self.workers / 2:
+                await self.redis_client.sadd(REDIS_KEY_USER_AGENTS, *self.user_agents)
+
+            if not await self.redis_client.exists(REDIS_KEY_DUMMY_SHOP_URLS):
+                break
+
+            await asyncio.sleep(10)
+
+    @staticmethod
+    async def _get_user_agent(redis_client):
+        user_agent = await redis_client.spop(REDIS_KEY_USER_AGENTS)
+        return (user_agent or b'').decode()
+
+    async def _connect_proxy(self, full_restart=True):
+        async with aiohttp.ClientSession() as client:
+            async with client.get(self.proxy_service_url + '/restart' + ('?full=1' if full_restart else '')) as resp:
+                data = await resp.json()
+                self.workers = min(self.workers, len(data['interfaces']) * 3 // 4)
+
+    async def _get_proxy(self, session):
+        async with session.get(self.proxy_service_url + '/get/ip') as resp:
+            proxy = await resp.json()
+            proxy = None if not proxy else 'http://{ip}:{port}'.format(**proxy)
 
         return proxy
 
-    def open_browser(self, default='Chrome'):
-        self.logger.info('browser: launching')
+    @staticmethod
+    async def _pop_shop_info(redis_client):
+        shop_info = await redis_client.spop(REDIS_KEY_DUMMY_SHOP_URLS)
+        if not shop_info:
+            return shop_info, None, None
 
-        proxy = self.reset_proxy() if self.enable_proxy else None
+        shop_url, keyword = json.loads(shop_info.decode())
+        shop_id = re.search(r'(\d+)\.(taobao\.com)', shop_url).group(1)
 
-        self.display.start()
+        return shop_info, shop_id, keyword
 
-        if default == 'Chrome':
-            chrome_options = webdriver.ChromeOptions()
-            chrome_options.add_argument('-incognito')
-            # chrome_options.add_argument('--headless')
-            # chrome_options.add_argument('--disable-gpu')
-            chrome_options.add_argument('--no-sandbox')
-            chrome_options.add_argument('window-size=360,640')
-            chrome_options.add_experimental_option('prefs', {'profile.managed_default_content_settings.images': 2})
-            if proxy:
-                chrome_options.add_argument('--proxy-server={}'.format(proxy))
+    @staticmethod
+    async def _add_shop_info(redis_client, shop_info):
+        if shop_info:
+            await redis_client.sadd(REDIS_KEY_DUMMY_SHOP_URLS, shop_info)
 
-            browser_kwargs = {'chrome_options': chrome_options}
-            browser_class = webdriver.Chrome
-        elif default == 'PhantomJS':
-            desired_capabilities = dict(DesiredCapabilities.PHANTOMJS)
-            desired_capabilities['phantomjs.page.settings.userAgent'] = (
-                'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) '
-                'AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1'
-            )
+    @staticmethod
+    async def _insert_goods_list(mongo_client, goods_list):
+        if goods_list:
+            await mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS].insert_many(goods_list)
 
-            browser_class = webdriver.PhantomJS
-
-            service_args = ['--load-images=no']
-            if proxy:
-                service_args.append('--proxy={}'.format(proxy))
-
-            browser_kwargs = {'desired_capabilities': desired_capabilities, 'service_args': service_args}
-        else:
-            raise NotImplementedError
-
+    async def _report_progress(self):
         while True:
-            try:
-                browser = browser_class(**browser_kwargs)
-            except Exception as e:
-                self.logger.exception(f'browser {self.__class__.__name__}.{inspect.currentframe().f_code.co_name}: {e}')
-            else:
-                self.logger.info('browser: ' + default)
-                return browser
+            pipeline = self.redis_client.pipeline()
+            pipeline.scard(REDIS_KEY_SHOP_URLS)
+            pipeline.scard(REDIS_KEY_DUMMY_SHOP_URLS)
+            total, left = await pipeline.execute()
+            finished = total - left
+            percentage = 100 * finished / total
 
-    def close_browser(self):
-        self.browser.close()
-        self.browser.service.process.send_signal(signal.SIGTERM)
-        self.browser.quit()
-        self.display.stop()
+            print('{0}  {1} / {2} = {3:.2f}%  {0}'.format('=' * 30, finished, total, percentage))
 
-    def find_taobao_goods(self, keyword, shop_id):
-        try:
-            goods_list = []
-
-            for a in self.browser.find_elements_by_xpath('//ul[@class="goods-list-items"]//a'):
-                goods_url = a.get_attribute('href')
-                goods_id = urllib.parse.parse_qs(urllib.parse.urlparse(goods_url).query)['id'][0]
-                goods_url = 'https://item.taobao.com/item.htm?id={}'.format(goods_id)
-
-                left = a.find_element_by_xpath('child::div[@class="left"]')
-                right = a.find_element_by_xpath('child::div[@class="right"]')
-
-                now = datetime.now()
-                today = now.today()
-
-                price_highlight = right.find_element_by_xpath(
-                    'child::p[@class="d-price"]/em[@class="h"]').text.strip('￥')
-                price_del = right.find_element_by_xpath('child::p[@class="d-price"]/del').text.strip('￥')
-                sales_volume = right.find_element_by_xpath('child::p[@class="info"]/span[@class="d-num"]/em').text
-
-                goods_info = {
-                    'id': int(goods_id),
-                    'url': goods_url,
-                    'from': '淘宝',
-                    'shop_id': int(shop_id),
-                    'keyword': urllib.parse.unquote(keyword),
-                    'search': self.browser.current_url,
-                    'date': datetime.fromordinal(today.toordinal()),
-                    'modified': now,
-                    'image': left.find_element_by_xpath('child::img').get_attribute('src'),
-                    'title': right.find_element_by_xpath('child::h3[@class="d-title"]').text,
-                    'price_highlight': float(price_highlight),
-                    'price_del': float(price_del) if price_del else None,
-                    'sales_volume': int(sales_volume)
-                }
-
-                goods_list.append(goods_info)
-
-                self.logger.info('goods: {}'.format(goods_info))
-        except Exception as e:
-            self.logger.exception(f'{self.__class__.__name__}.{inspect.currentframe().f_code.co_name}: {e}')
-        else:
-            self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS].insert_many(goods_list)
-
-    def find_tmall_goods(self, keyword, shop_id):
-        try:
-            goods_list = []
-
-            for a in self.browser.find_elements_by_xpath('//div[@class="tile_box"]//a[@class="tile_item"]'):
-                goods_url = a.get_attribute('href')
-                goods_id = urllib.parse.parse_qs(urllib.parse.urlparse(goods_url).query)['id'][0]
-                goods_url = 'https://detail.m.tmall.com/item.htm?id={}'.format(goods_id)
-
-                now = datetime.now()
-                today = now.today()
-
-                price_highlight = a.find_element_by_xpath('descendant::div[@class="tii_price"]').text.split()[0]
-                price_highlight = re.sub(r'.*?(\d+\.*\d*).*', r'\g<1>', price_highlight)
-
-                sales_volume = a.find_element_by_xpath(
-                    'descendant::div[@class="tii_price"]/span[@class="tii_sold"]').text
-                sales_volume = re.sub(r'.*?(\d+).*', r'\g<1>', sales_volume)
-
-                goods_info = {
-                    'id': int(goods_id),
-                    'url': goods_url,
-                    'from': '天猫',
-                    'shop_id': int(shop_id),
-                    'keyword': urllib.parse.unquote(keyword),
-                    'search': self.browser.current_url,
-                    'date': datetime.fromordinal(today.toordinal()),
-                    'modified': now,
-                    'image': a.find_element_by_xpath('descendant::img[@class="ti_img"]').get_attribute('src'),
-                    'title': a.find_element_by_xpath('descendant::div[@class="tii_title"]/h3').text,
-                    'price_highlight': float(price_highlight),
-                    'price_del': None,
-                    'sales_volume': int(sales_volume)
-                }
-
-                goods_list.append(goods_info)
-
-                self.logger.info('goods: {}'.format(goods_info))
-        except Exception as e:
-            self.logger.exception(f'{self.__class__.__name__}.{inspect.currentframe().f_code.co_name}: {e}')
-        else:
-            self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS].insert_many(goods_list)
-
-    def traversal_tabao_shop(self, keyword, shop_id):
-        pages = 0
-
-        try:
-            WebDriverWait(self.browser, 15).until(
-                expected_conditions.presence_of_element_located((By.CSS_SELECTOR, 'h3.d-title'))
-            )
-        except Exception as e:
-            _ = e
-        else:
-            self.find_taobao_goods(keyword=keyword, shop_id=shop_id)
-
-            # 下一页
-            xpath = (
-                '//div[@id="gl-pagenav"]//'
-                'a[contains(@class, "c-p-next") and not(contains(@class, "c-btn-off"))]'
-            )
-            while True:
-                try:
-                    self.browser.find_element_by_xpath(xpath).click()
-                    self.browser.implicitly_wait(3)
-                    pages += 1
-                except Exception as e:
-                    _ = e
-                    break
-                else:
-                    self.find_taobao_goods(keyword=keyword, shop_id=shop_id)
-
-        return pages
-
-    def traversal_tmall_shop(self, p2, keyword, shop_id):
-        pages = 0
-
-        request_url = f'{p2.scheme}://{p2.hostname}/shop/shop_auction_search.htm?q={keyword}'
-        self.logger.info('shop: ' + request_url)
-
-        self.browser.get(request_url)
-        pages += 1
-
-        try:
-            WebDriverWait(self.browser, 15).until(
-                expected_conditions.presence_of_element_located((By.CSS_SELECTOR, '.tii_title h3'))
-            )
-        except Exception as e:
-            _ = e
-        else:
-            # 上拉加载
-            xpath = '//section[@class="state" and contains(text(), "已经看到最后啦~")]'
-            for _ in range(100):
-                try:
-                    self.browser.find_element_by_xpath(xpath)
-                except Exception as e:
-                    _ = e
-                    self.browser.execute_script('document.body.scrollTop += 500')
-                    self.browser.implicitly_wait(3)
-                    pages += 1
-                else:
-                    break
-
-            self.find_tmall_goods(keyword=keyword, shop_id=shop_id)
-
-        return pages
-
-    def dump_main_goods(self, date=datetime.fromordinal(datetime.today().toordinal()), limit=3000):
-        self.logger.info('{0} {1} {0}'.format('=' * 40, datetime.now()))
-
-        self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].create_index([
-            ('id', pymongo.ASCENDING), ('shop_id', pymongo.ASCENDING), ('keyword', pymongo.ASCENDING)
-        ])
-
-        for keyword in self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS].find({'date': {'$gte': date}}).distinct('keyword'):
-            self.logger.info('{0} {1}'.format(datetime.now(), keyword))
-
-            goods_list = list(self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS].find(
-                {'date': date, 'keyword': keyword}).sort([('sales_volume', pymongo.DESCENDING)]).limit(limit=limit))
-
-            for i in range(0, len(goods_list), 100):
-                items = goods_list[i: i + 100]
-                self.redis.sadd(REDIS_KEY_GOODS_URLS, *[item['url'] for item in items])
-                self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].delete_many({
-                    'id': {'$in': [item['id'] for item in items]}
-                })
-                self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].insert_many(items)
-
-            self.logger.info('{0} {1}'.format(datetime.now(), len(goods_list)))
-
-        self.logger.info('{0} {1} {0}'.format('=' * 40, datetime.now()))
-
-    def run(self):
-        self.logger.info('-' * 100)
-
-        pages = 0
-
-        if self.redis.exists(REDIS_KEY_DUMMY_SHOP_URLS):
-            self.redis.hsetnx(REDIS_KEY_TASK_RUNNING, 'start', datetime.now().strftime(DATE_TIME_FORMAT))
-
-        while True:
-            if pages > 0 and pages % self.max_pages == 0:
+            if not left:
                 break
 
-            shop_info = self.redis.spop(REDIS_KEY_DUMMY_SHOP_URLS)
-            if not shop_info:
-                start = (self.redis.hget(REDIS_KEY_TASK_RUNNING, 'start') or b'').decode()
-                if start and self.redis.delete(REDIS_KEY_TASK_RUNNING) > 0:
-                    start = datetime.strptime(start, DATE_TIME_FORMAT)
-                    end = datetime.now()
-                    today = datetime.fromordinal(end.today().toordinal())
-                    count = self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS].find({'date': today}).count()
-
-                    self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_LOG].insert({
-                        'start': start, 'end': end, 'date': today, 'count': count
-                    })
-                    self.logger.info('{0} {1} -> {2} = {3} {0}'.format('=' * 40, start, end, count))
-
-                    self.dump_main_goods(date=start)
-
-                break
-
-            shop_url, keyword = json.loads(shop_info)
-            keyword = urllib.parse.quote(keyword)
-            shop_id = re.sub(r'.*shop(\d+)\.taobao\.com.*', r'\g<1>', shop_url)
-            shop_url = re.sub(r'(\d+)\.(taobao\.com)', r'\g<1>.m.\g<2>', shop_url)
-
-            request_url = '{}/#list?q={}'.format(shop_url, keyword)
-            self.logger.info('shop: ' + request_url)
-
-            # # 测试天猫
-            # keyword = 'AHC'
-            # shop_id = 117058577
-            # request_url = 'https://shop117058577.m.taobao.com/#list?q=AHC'
-            # # 测试淘宝
-            # keyword = '%E9%9F%A9%E5%9B%BD'
-            # shop_id = 34135992
-            # request_url = 'https://shop34135992.m.taobao.com/#list?q=%E9%9F%A9%E5%9B%BD'
-
-            self.browser.get(request_url)
-
-            response_url = self.browser.current_url
-            pages += 1
-
-            p1 = urllib.parse.urlparse(request_url)
-            p2 = urllib.parse.urlparse(response_url)
-
-            if p1.hostname.endswith('taobao.com') and p2.hostname.endswith('tmall.com'):
-                # 天猫
-                pages += self.traversal_tmall_shop(p2=p2, keyword=keyword, shop_id=shop_id)
-            else:
-                # 淘宝
-                pages += self.traversal_tabao_shop(keyword=keyword, shop_id=shop_id)
-
-        self.close_browser()
-        self.logger.info('-' * 100)
-
-
-class TaskDispatcher(object):
-    def __init__(
-            self, max_pages, enable_proxy=True, log_dir='~/data/logs/taobao/goods_list/',
-            redis_url=os.environ.get('REDIS_URL') or 'redis://localhost:6379/1',
-            mongo_url=os.environ.get('MONGO_URL') or 'mongodb://localhost:27017/'
-    ):
-        self.max_pages = max_pages
-        self.enable_proxy = enable_proxy
-        self.redis_url = redis_url
-        self.mongo_url = mongo_url
-        self.log_dir = log_dir
-
-        self.logger = init_logger(name=self.__class__.__name__, task_id=0, log_dir=log_dir)
-
-        self.gracefully_exit = GracefullyExit()
-
-        self.redis = redis.from_url(redis_url)
-        self.mongo = pymongo.MongoClient(mongo_url)
-
-    def task(self, task_id):
-        fetcher = GetGoods(
-            task_id=task_id, max_pages=self.max_pages, enable_proxy=self.enable_proxy,
-            redis_url=self.redis_url, mongo_url=self.mongo_url, log_dir=self.log_dir
-        )
-        fetcher.run()
-
-    def run(self):
-        if self.redis.exists(REDIS_KEY_DUMMY_GOODS_URLS):
-            return
-
-        if self.mongo[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].find_one(
-                {'date': datetime.fromordinal(datetime.today().toordinal())}):
-            return
-
-        if self.redis.scard(REDIS_KEY_DUMMY_SHOP_URLS) == 0:
-            values = list(self.redis.smembers(REDIS_KEY_SHOP_URLS))
-            for i in range(0, len(values), 100):
-                self.redis.sadd(REDIS_KEY_DUMMY_SHOP_URLS, *values[i: i + 100])
-
-        tasks = {i: None for i in (range(23, 57) if self.enable_proxy else range(23, 24))}
-
-        while True:
-            for task_id in tasks:
-                if not tasks[task_id] or not tasks[task_id].is_alive():
-                    process = multiprocessing.Process(name=task_id, target=self.task, args=(task_id,))
-                    process.start()
-
-                    tasks[task_id] = process
-
-            if self.gracefully_exit.received:
-                for task_id in tasks:
-                    if tasks[task_id].is_alive():
-                        tasks[task_id].terminate()
-                break
-
-            if not self.redis.exists(REDIS_KEY_TASK_RUNNING):
-                break
-
-            time.sleep(0.1)
+            await asyncio.sleep(10)
 
 
 if __name__ == '__main__':
-    """
-    Usage: get_goods.py MAX_PAGES [ENABLE_PROXY] [REDIS_URL] [LOG_DIR]
-           get_goods.py --max-pages MAX_PAGES [--enable-proxy ENABLE_PROXY] [--redis-url REDIS_URL] [--log-dir LOG_DIR]
+    dispatcher = Dispatcher(workers=20, shops_per_proxy=10)
 
-    Example: get_goods.py run --max-pages=25
-             screen -dmS get_goods get_goods.py run --max-pages=25
-    """
-
-    fire.Fire(TaskDispatcher)
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(dispatcher.start())
