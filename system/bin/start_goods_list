@@ -1,5 +1,0 @@
-#!/bin/bash
-
-supervisorctl stop change_ip_task
-supervisorctl stop test_ip_living_time_is_over_task
-supervisorctl start goods_list

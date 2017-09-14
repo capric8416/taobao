@@ -437,17 +437,30 @@ class Dispatcher(object):
         return (user_agent or b'').decode()
 
     async def _connect_proxy(self, full_restart=True):
-        async with aiohttp.ClientSession() as client:
-            async with client.get(self.proxy_service_url + '/restart' + ('?full=1' if full_restart else '')) as resp:
-                data = await resp.json()
-                self.workers = min(self.workers, len(data['interfaces']) * 3 // 4)
+        while True:
+            try:
+                async with aiohttp.ClientSession() as client:
+                    url = self.proxy_service_url + '/restart' + ('?full=1' if full_restart else '')
+                    async with client.get(url) as resp:
+                        data = await resp.json()
+                        self.workers = min(self.workers, len(data['interfaces']) * 3 // 4)
+            except Exception as e:
+                self.logger.exception(e)
+                await asyncio.sleep(1)
+            else:
+                return
 
     async def _get_proxy(self, session):
-        async with session.get(self.proxy_service_url + '/get/ip') as resp:
-            proxy = await resp.json()
-            proxy = None if not proxy else 'http://{ip}:{port}'.format(**proxy)
-
-        return proxy
+        while True:
+            try:
+                async with session.get(self.proxy_service_url + '/get/ip') as resp:
+                    proxy = await resp.json()
+                    proxy = None if not proxy else 'http://{ip}:{port}'.format(**proxy)
+            except Exception as e:
+                self.logger.exception(e)
+                await asyncio.sleep(1)
+            else:
+                return proxy
 
     @staticmethod
     async def _pop_shop_info(redis_client):
