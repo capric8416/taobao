@@ -312,7 +312,7 @@ class Dispatcher(object):
         self.user_agents = []
 
         self.exceptions = (asyncio.TimeoutError, aiohttp.ClientConnectorError,
-                           aiohttp.ClientResponseError, aiohttp.ClientOSError)
+                           aiohttp.ClientResponseError, aiohttp.ClientOSError, AuthError)
 
     async def start(self):
         self._load_user_agents()
@@ -348,15 +348,13 @@ class Dispatcher(object):
 
                     async with GetShopItemList(user_agent=user_agent, proxy=proxy) as client:
                         dt1 = datetime.now()
+                        goods_list = []
 
                         try:
                             goods_list = await client.search(shop_id=int(shop_id), query=query)
                         except self.exceptions as e:
                             self.logger.exception(e)
-                            goods_list = []
                             await self._add_shop_info(redis_client=redis_client, shop_info=shop_info)
-                            if isinstance(e, AuthError):
-                                break
                         else:
                             await self._insert_goods_list(mongo_client=mongo_client, goods_list=goods_list)
                         finally:
