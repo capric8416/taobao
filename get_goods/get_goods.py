@@ -43,6 +43,10 @@ MONGO_COLLECTION_GOODS_MAIN = 'goods_list_main'
 MONGO_COLLECTION_GOODS_LOG = 'goods_list_logs'
 
 
+class AuthError(Exception):
+    pass
+
+
 class GetShopItemList(aiohttp.ClientSession):
     def __init__(self, delay=3, timeout=15, user_agent='', proxy=None):
         super(GetShopItemList, self).__init__()
@@ -94,7 +98,7 @@ class GetShopItemList(aiohttp.ClientSession):
 
         resp = await self._open(shop_id=shop_id, query=query)
         if resp.url.host == self.host_error_taobao:
-            raise asyncio.TimeoutError('访问受限')
+            raise AuthError('访问受限')
 
         results = []
 
@@ -125,10 +129,10 @@ class GetShopItemList(aiohttp.ClientSession):
                 if data['ret'] == ['SUCCESS::调用成功']:
                     break
                 elif data['ret'] == ['RGV587_ERROR::SM']:
-                    raise asyncio.TimeoutError('要求登录')
+                    raise AuthError('要求登录')
 
             if not data:
-                raise asyncio.TimeoutError('调用接口失败')
+                raise AuthError('调用接口失败')
 
             results.append(data)
 
@@ -150,7 +154,7 @@ class GetShopItemList(aiohttp.ClientSession):
         url = f'http://shop.m.taobao.com/shop/shop_index.htm?shop_id={shop_id}#list?q={parse.quote(query)}'
         self.search_url = url
 
-        resp = await self._request_data(url=url, headers={'User-Agent': self.user_agent})
+        resp = await self._request_data(url=url)
         return resp
 
     async def _search(self, shop_id, shop_type, hostname, query, page=1):
@@ -166,8 +170,7 @@ class GetShopItemList(aiohttp.ClientSession):
             return await self._request_data(
                 url='https://api.m.taobao.com/h5/com.taobao.search.api.getshopitemlist/2.0/',
                 params=self.params[shop_type], as_text=True,
-                headers={'Referer': f'http://shop.m.taobao.com/shop/shop_index.htm?shop_id={shop_id}',
-                         'User-Agent': self.user_agent}
+                headers={'Referer': f'http://shop.m.taobao.com/shop/shop_index.htm?shop_id={shop_id}'}
             )
         else:
             url = f'https://{hostname}/shop/shop_auction_search.do'
@@ -181,8 +184,7 @@ class GetShopItemList(aiohttp.ClientSession):
             return await self._request_data(
                 url=url, params=self.params[shop_type], as_text=True,
                 headers={'Referer': f'https://{hostname}/shop/shop_auction_search.htm'
-                                    f'?q={parse.quote(query)}&_input_charset=utf-8&sort=d',
-                         'User-Agent': self.user_agent}
+                                    f'?q={parse.quote(query)}&_input_charset=utf-8&sort=d'}
             )
 
     def _extract(self, shop_type, now, today, results):
@@ -251,6 +253,8 @@ class GetShopItemList(aiohttp.ClientSession):
         kwargs = copy.deepcopy(kwargs)
         kwargs['timeout'] = self.timeout
         kwargs['proxy'] = self.proxy
+        kwargs['headers'] = kwargs.pop('headers', {})
+        kwargs['headers'].update({'User-Agent': self.user_agent})
 
         async with self.get(*args, **kwargs) as resp:
             if as_json:
@@ -307,8 +311,8 @@ class Dispatcher(object):
 
         self.user_agents = []
 
-        self.exceptions = (asyncio.TimeoutError, aiohttp.client_exceptions.ClientConnectorError,
-                           aiohttp.client_exceptions.ClientResponseError, aiohttp.client_exceptions.ClientOSError)
+        self.exceptions = (asyncio.TimeoutError, aiohttp.ClientConnectorError,
+                           aiohttp.ClientResponseError, aiohttp.ClientOSError)
 
     async def start(self):
         self._load_user_agents()
@@ -351,6 +355,8 @@ class Dispatcher(object):
                             self.logger.exception(e)
                             goods_list = []
                             await self._add_shop_info(redis_client=redis_client, shop_info=shop_info)
+                            if isinstance(e, AuthError):
+                                break
                         else:
                             await self._insert_goods_list(mongo_client=mongo_client, goods_list=goods_list)
                         finally:
