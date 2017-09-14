@@ -51,7 +51,7 @@ class GetShopItemList(aiohttp.ClientSession):
     def __init__(self, delay=3, timeout=15, user_agent='', proxy=None):
         super(GetShopItemList, self).__init__()
 
-        self.logger = get_logger(__name__)
+        self.logger = get_logger('@@@@')
 
         self.delay = delay
         self.timeout = timeout
@@ -123,9 +123,13 @@ class GetShopItemList(aiohttp.ClientSession):
                     results.append(data)
         else:
             shop_type = self.taobao
-            for _ in range(10):
+            for i in range(10):
                 text = await self._search(hostname='', shop_id=shop_id, shop_type=shop_type, query=query)
                 data = self._json(text=text, callback=self.params[shop_type]['callback'])
+
+                if i == 0:
+                    await self._request_mmstat_log(query=query)
+
                 if data['ret'] == ['SUCCESS::调用成功']:
                     break
                 elif data['ret'] == ['RGV587_ERROR::SM']:
@@ -186,6 +190,26 @@ class GetShopItemList(aiohttp.ClientSession):
                 headers={'Referer': f'https://{hostname}/shop/shop_auction_search.htm'
                                     f'?q={parse.quote(query)}&_input_charset=utf-8&sort=d'}
             )
+
+    async def _request_mmstat_log(self, query):
+        url = 'http://log.mmstat.com/m.gif'
+        params = {
+            'logtype': 1,
+            'title': '(unable to decode value)',
+            'cache': '2886fc5',
+            'scr': '1080x1920',
+            'isbeta': '9',
+            'lver': '0.4.8',
+            'cna': self._get_cookie(name='cna'),
+            'spm-cnt': '0.0.0.0',
+            'aplus': '',
+            'urlokey': f'list?q={query}',
+            'tag': '1',
+            'stag': '-1',
+
+        }
+
+        await self._request_data(url=url, params=params)
 
     def _extract(self, shop_type, now, today, results):
         goods_list = []
@@ -271,11 +295,14 @@ class GetShopItemList(aiohttp.ClientSession):
         return str(t) if as_str else t
 
     def _token(self):
-        for cookie in self.cookie_jar:
-            if cookie.key == '_m_h5_tk':
-                return cookie.value.partition('_')[0]
+        return self._get_cookie(name='_m_h5_tk', default='undefined').partition('_')[0]
 
-        return 'undefined'
+    def _get_cookie(self, name, default=''):
+        for cookie in self.cookie_jar:
+            if cookie.key == name:
+                return cookie.value
+
+        return default
 
     def _sign(self):
         return hashlib.md5('&'.join([
@@ -297,7 +324,7 @@ class Dispatcher(object):
     def __init__(self, workers, shops_per_proxy, proxy_service_url='http://localhost:8080',
                  redis_url=os.environ.get('REDIS_URL') or 'redis://localhost:6379',
                  mongo_url=os.environ.get('MONGO_URL') or 'mongodb://localhost:27017/'):
-        self.logger = get_logger(__name__)
+        self.logger = get_logger('####')
 
         self.workers = workers
         self.shops_per_proxy = shops_per_proxy
@@ -336,7 +363,8 @@ class Dispatcher(object):
                     await asyncio.sleep(1)
                     continue
 
-                for _ in range(self.shops_per_proxy):
+                i = 0
+                while i < 10:
                     user_agent = await self._get_user_agent(redis_client=redis_client)
                     if not user_agent:
                         await asyncio.sleep(1)
@@ -355,11 +383,16 @@ class Dispatcher(object):
                         except self.exceptions as e:
                             self.logger.exception(e)
                             await self._add_shop_info(redis_client=redis_client, shop_info=shop_info)
+
+                            i = 10
                         else:
                             await self._insert_goods_list(mongo_client=mongo_client, goods_list=goods_list)
-                        finally:
-                            dt2 = datetime.now()
-                            print(identity, (dt2 - dt1).total_seconds(), shop_id, query, proxy, goods_list)
+
+                        i += 1
+
+                        dt2 = datetime.now()
+                        self.logger.info(
+                            f'{identity} {(dt2 - dt1).total_seconds()} {shop_id} {query} {proxy} {goods_list}')
 
     async def _connect_storage(self):
         mongo_client = motor.motor_asyncio.AsyncIOMotorClient(self.mongo_url)
@@ -444,7 +477,7 @@ class Dispatcher(object):
             finished = total - left
             percentage = 100 * finished / total
 
-            print('{0}  {1} / {2} = {3:.2f}%  {0}'.format('=' * 30, finished, total, percentage))
+            self.logger.info('{0}  {1} / {2} = {3:.2f}%  {0}'.format('=' * 30, finished, total, percentage))
 
             if not left:
                 break
@@ -453,7 +486,7 @@ class Dispatcher(object):
 
 
 if __name__ == '__main__':
-    dispatcher = Dispatcher(workers=20, shops_per_proxy=10)
+    dispatcher = Dispatcher(workers=10, shops_per_proxy=10)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(dispatcher.start())
