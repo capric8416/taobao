@@ -16,6 +16,7 @@ from urllib import parse
 import aiohttp
 import aioredis
 import motor.motor_asyncio
+import pymongo
 from pyquery import PyQuery
 from proxy_swift import get_logger
 
@@ -338,9 +339,6 @@ class Dispatcher(object):
 
         self.user_agents = []
 
-        self.exceptions = (asyncio.TimeoutError, aiohttp.ClientConnectorError,
-                           aiohttp.ClientResponseError, aiohttp.ClientOSError, AuthError)
-
     async def start(self):
         self._load_user_agents()
 
@@ -348,11 +346,15 @@ class Dispatcher(object):
         await self._connect_proxy(full_restart=not DEBUG)
         await self._check_shop_urls()
 
+        await self._start()
+
         tasks = [self._check_user_agents(), self._report_progress()]
         for identity in range(self.workers):
             tasks.append(self.get_shop_item_list(identity=identity))
 
         await asyncio.gather(*tasks)
+
+        await self._stop()
 
     async def get_shop_item_list(self, identity):
         async with aiohttp.ClientSession() as session:
@@ -380,7 +382,7 @@ class Dispatcher(object):
 
                         try:
                             goods_list = await client.search(shop_id=int(shop_id), query=query)
-                        except self.exceptions as e:
+                        except Exception as e:
                             self.logger.exception(e)
                             await self._add_shop_info(redis_client=redis_client, shop_info=shop_info)
 
@@ -467,6 +469,52 @@ class Dispatcher(object):
     async def _insert_goods_list(mongo_client, goods_list):
         if goods_list:
             await mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS].insert_many(goods_list)
+
+    async def _start(self):
+        await self.redis_client.hsetnx(REDIS_KEY_TASK_RUNNING, 'start', datetime.now().strftime(DATE_TIME_FORMAT))
+
+    async def _stop(self):
+        start = await self.redis_client.hget(REDIS_KEY_TASK_RUNNING)
+        start = (start or b'').decode()
+        if start and await self.redis_client.delete(REDIS_KEY_TASK_RUNNING) > 0:
+            start = datetime.strptime(start, DATE_TIME_FORMAT)
+            end = datetime.now()
+            today = datetime.fromordinal(end.today().toordinal())
+
+            count = await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS].find({'date': today}).count()
+            await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS_LOG].insert({
+                'start': start, 'end': end, 'date': today, 'count': count
+            })
+
+            self.dump_main_goods(date=today)
+
+            self.logger.info('{0} {1} -> {2} = {3} {0}'.format('=' * 40, start, end, count))
+
+    async def dump_main_goods(self, date=datetime.fromordinal(datetime.today().toordinal()), limit=3000):
+        self.logger.info('>' * 100)
+
+        await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].create_index([
+            ('id', pymongo.ASCENDING), ('shop_id', pymongo.ASCENDING), ('keyword', pymongo.ASCENDING)
+        ])
+
+        for keyword in await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS].find(
+                {'date': {'$gte': date}}).distinct('keyword'):
+            self.logger.info('{0} {1}'.format(datetime.now(), keyword))
+
+            goods_list = await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS].find(
+                {'date': {'$gte': date}, 'keyword': keyword}).sort(
+                [('sales_volume', pymongo.DESCENDING)]).limit(limit=limit)
+            goods_list = list(goods_list)
+
+            for i in range(0, len(goods_list), 100):
+                items = goods_list[i: i + 100]
+                await self.redis_client.sadd(REDIS_KEY_GOODS_URLS, *[item['url'] for item in items])
+                await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].delete_many({
+                    'id': {'$in': [item['id'] for item in items]}
+                })
+                await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].insert_many(items)
+
+        self.logger.info('<' * 100)
 
     async def _report_progress(self):
         while True:
