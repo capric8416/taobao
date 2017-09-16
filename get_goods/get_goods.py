@@ -4,7 +4,7 @@
 import asyncio
 import copy
 import hashlib
-import json
+import ujson as json
 import math
 import os
 import re
@@ -17,9 +17,11 @@ import aiohttp
 import aioredis
 import motor.motor_asyncio
 import pymongo
+import uvloop
 from pyquery import PyQuery
 from proxy_swift import get_logger
 
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 DEBUG = True if '--debug' in sys.argv else False
 
@@ -339,7 +341,7 @@ class Dispatcher(object):
 
         self.user_agents = []
 
-    async def start(self):
+    async def run(self):
         self._load_user_agents()
 
         await self._connect_storage()
@@ -360,18 +362,14 @@ class Dispatcher(object):
         async with aiohttp.ClientSession() as session:
             mongo_client, redis_client = await self._connect_storage()
             while True:
-                proxy = await self._get_proxy(session=session)
+                proxy, user_agent = await asyncio.gather(self._get_proxy(session=session),
+                                                         self._get_user_agent(redis_client=redis_client))
                 if not proxy:
                     await asyncio.sleep(1)
                     continue
 
                 i = 0
                 while i < 10:
-                    user_agent = await self._get_user_agent(redis_client=redis_client)
-                    if not user_agent:
-                        await asyncio.sleep(1)
-                        continue
-
                     shop_info, shop_id, query = await self._pop_shop_info(redis_client=redis_client)
                     if not all([shop_id, query]):
                         return
@@ -550,4 +548,4 @@ if __name__ == '__main__':
     dispatcher = Dispatcher(workers=10, shops_per_proxy=10)
 
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(dispatcher.start())
+    loop.run_until_complete(dispatcher.run())
