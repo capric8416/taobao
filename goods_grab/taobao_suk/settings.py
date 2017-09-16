@@ -31,7 +31,7 @@ ROBOTSTXT_OBEY = False
 
 LOG_LEVEL = 'DEBUG'
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-CONCURRENT_REQUESTS = 16
+CONCURRENT_REQUESTS = 12
 
 # Configure a delay for requests for the same website (default: 0)
 # See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay
@@ -39,7 +39,7 @@ CONCURRENT_REQUESTS = 16
 DOWNLOAD_DELAY = 0.7
 SCHEDULER_IDLE_BEFORE_CLOSE = 30
 # The download delay setting will honor only one of:
-CONCURRENT_REQUESTS_PER_DOMAIN = 5
+CONCURRENT_REQUESTS_PER_DOMAIN = 4
 
 COOKIES_ENABLED = False
 #CONCURRENT_REQUESTS_PER_IP = 16
