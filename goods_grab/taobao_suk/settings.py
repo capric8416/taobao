@@ -37,6 +37,7 @@ CONCURRENT_REQUESTS = 16
 # See http://scrapy.readthedocs.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
 DOWNLOAD_DELAY = 0.7
+SCHEDULER_IDLE_BEFORE_CLOSE = 30
 # The download delay setting will honor only one of:
 CONCURRENT_REQUESTS_PER_DOMAIN = 5
 
