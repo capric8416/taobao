@@ -113,6 +113,10 @@ class GetShopItemList(aiohttp.ClientSession):
 
             text = await self._search(hostname=resp.url.host, shop_id=shop_id, shop_type=shop_type, query=query)
             data = self._json(text=text, callback=self.params[shop_type]['callback'])
+
+            if not data:
+                raise AuthError('调用接口失败')
+
             results.append(data)
 
             total_page = int(data['total_page'])
@@ -221,6 +225,7 @@ class GetShopItemList(aiohttp.ClientSession):
             for page in results:
                 for item in page.get('items', []):
                     goods_url = 'https:' + item['url'] if item['url'].startswith('//') else item['url']
+                    pic_url = item.get('img', '')
                     goods_info = {
                         'keyword': self.search_keyword,
                         'search': self.search_url,
@@ -230,7 +235,7 @@ class GetShopItemList(aiohttp.ClientSession):
                         'from': '天猫',
                         'shop_id': int(page['shop_id']),
                         'shop_title': page['shop_title'],
-                        'image': 'https:' + item['img'] if item['img'].startswith('//') else item['img'],
+                        'image': 'https:' + pic_url if pic_url.startswith('//') else pic_url,
                         'title': PyQuery(item['title']).text().strip(),
                         'price_highlight': float(item['price']),
                         'price_del': None,
@@ -248,6 +253,7 @@ class GetShopItemList(aiohttp.ClientSession):
                 page = page['data']
                 for item in page.get('itemsArray', []):
                     goods_url = 'https://item.taobao.com/item.htm?id=' + item['auctionId']
+                    pic_url = item.get('picUrl', '')
                     goods_info = {
                         'keyword': self.search_keyword,
                         'search': self.search_url,
@@ -257,7 +263,7 @@ class GetShopItemList(aiohttp.ClientSession):
                         'from': '淘宝',
                         'shop_id': int(page['shopId']),
                         'shop_title': page['shopTitle'],
-                        'image': 'https:' + item['picUrl'] if item['picUrl'].startswith('//') else item['picUrl'],
+                        'image': 'https:' + pic_url if pic_url.startswith('//') else pic_url,
                         'title': item['title'],
                         'price_highlight': float(item['salePrice']),
                         'price_del': float(item['reservePrice']) if item['reservePrice'] else None,
@@ -485,15 +491,15 @@ class Dispatcher(object):
         await self.redis_client.hsetnx(REDIS_KEY_TASK_RUNNING, 'start', datetime.now().strftime(DATE_TIME_FORMAT))
 
     async def _stop(self):
-        start = await self.redis_client.hget(REDIS_KEY_TASK_RUNNING)
+        start = await self.redis_client.hget(REDIS_KEY_TASK_RUNNING, 'start')
         start = (start or b'').decode()
         if start and await self.redis_client.delete(REDIS_KEY_TASK_RUNNING) > 0:
             start = datetime.strptime(start, DATE_TIME_FORMAT)
             end = datetime.now()
             today = datetime.fromordinal(end.today().toordinal())
 
-            count = await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS].find({'date': today}).count()
-            await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS_LOG].insert({
+            count = await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS].find({'date': {'$gte': start}}).count()
+            await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS_LOG].insert_one({
                 'start': start, 'end': end, 'date': today, 'count': count
             })
 
