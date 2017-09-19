@@ -551,7 +551,7 @@ class Dispatcher(object):
 
 
 if __name__ == '__main__':
-    dispatcher = Dispatcher(workers=10, shops_per_proxy=10)
+    dispatcher = Dispatcher(workers=20, shops_per_proxy=10)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(dispatcher.run())
