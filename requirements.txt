@@ -13,3 +13,4 @@ aiohttp_session
 motor
 ujson
 uvloop
+openpyxl

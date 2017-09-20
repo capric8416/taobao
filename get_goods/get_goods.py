@@ -4,12 +4,12 @@
 import asyncio
 import copy
 import hashlib
-import ujson as json
 import math
 import os
 import re
 import sys
 import time
+import ujson as json
 from datetime import datetime
 from urllib import parse
 
@@ -18,8 +18,10 @@ import aioredis
 import motor.motor_asyncio
 import pymongo
 import uvloop
-from pyquery import PyQuery
 from proxy_swift import get_logger
+from pyquery import PyQuery
+
+from scripts import TranslateGoodsName
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
@@ -504,6 +506,9 @@ class Dispatcher(object):
             })
 
             self.dump_main_goods(date=today)
+
+            translate = TranslateGoodsName(mapping_excel='')
+            translate.update_goods_main(collection_name=MONGO_COLLECTION_GOODS_MAIN)
 
             self.logger.info('{0} {1} -> {2} = {3} {0}'.format('=' * 40, start, end, count))
 
