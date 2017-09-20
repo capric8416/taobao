@@ -111,6 +111,24 @@ class GoodsGrab(RedisSpider):
         base_info['modified'] = datetime.now()
         now_today = datetime.today()
         base_info['date'] = datetime.fromordinal(now_today.toordinal())
+
+        price = str(base_info['price']).split('-')
+        if len(price) >= 2:
+            # 30天销售额
+            base_info['price_min'] = float(price[0])
+            base_info['price_max'] = float(price[-1])
+        else:
+            base_info['price_min'] = base_info['price_max'] = price[0]
+
+        # add original_price_min original_price_max
+        original_price = str(base_info['original_price']).split('-')
+
+        if len(original_price) >= 2:
+            base_info['original_price_min'] = float(original_price[0])
+            base_info['original_price_max'] = float(original_price[-1])
+        else:
+            base_info['original_price_min'] = item['original_price_max'] = original_price[0]
+
         yield items.TaobaoSukItem(detail={'goods_info': base_info})
 
     def tianmao_m_pag(self, response):
@@ -217,8 +235,21 @@ class GoodsGrab(RedisSpider):
         if len(price) >= 2:
             # 30天销售额
             item['month_sales'] = str(item['sell_count'] * float(price[0])) + '-' + str(item['sell_count'] * float(price[-1]))
+            item['price_min'] = float(price[0])
+            item['price_max'] = float(price[-1])
         else:
             item['month_sales'] = item['sell_count'] * float(price[0])
+            item['price_min'] = item['price_max'] = price[0]
+
+        # add original_price_min original_price_max
+        original_price = str(item['original_price']).split('-')
+
+        if len(original_price) >= 2:
+            item['original_price_min'] = float(original_price[0])
+            item['original_price_max'] = float(original_price[-1])
+        else:
+            item['original_price_min'] = item['original_price_max'] = original_price[0]
+
         item['shop_type'] = '天猫'
         item['modified'] = datetime.now()
         now_today = datetime.today()
