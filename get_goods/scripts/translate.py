@@ -49,7 +49,15 @@ class TranslateGoodsName(object):
             filter={'goods_id': data['goods_id']}, update={'$set': data}, upsert=True)
 
     def update_goods_main(self, collection_name):
-        data = [item for item in self.mongo_client[self.mongo_db][collection_name].find()]
+        mapping = {
+            item['goods_id']: item['goods_name']
+            for item in self.mongo_client[self.mongo_db][self.mongo_collection].find()
+        }
+
+        data = []
+        for item in self.mongo_client[self.mongo_db][collection_name].find():
+            item['standard_name'] = mapping.get(item['id'], '')
+            data.append(item)
 
         pool = ThreadPool(processes=self.workers)
         pool.starmap(self._update_goods_main, zip(itertools.repeat(collection_name, len(data)), data))
@@ -57,12 +65,10 @@ class TranslateGoodsName(object):
         pool.join()
 
     def _update_goods_main(self, collection_name, record):
-        mapping = self.mongo_client[self.mongo_db][self.mongo_collection].find_one({'goods_id': record['id']}) or {}
-
-        print(mapping)
+        print(record['id'], record['standard_name'])
 
         self.mongo_client[self.mongo_db][collection_name].update_one(
-            filter={'_id': record['_id']}, update={'$set': {'standard_name': mapping.get('goods_name', '')}})
+            filter={'_id': record['_id']}, update={'$set': {'standard_name': record['standard_name']}})
 
 
 if __name__ == '__main__':
