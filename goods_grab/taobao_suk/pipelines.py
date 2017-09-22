@@ -56,6 +56,7 @@ class TaobaoSukPipeline(object):
             for i in range(0, len(values), 100):
                 self.rds.sadd(REDIS_KEY_DUMMY_SHOP_URLS, *values[i: i + 100])
 
+
     def process_item(self, item, spider):
         #  当去重字段为1个的时候 直接插入， 如果去重判断为多个字段时候拼接字符串生成MD5作为unique_id
         try:

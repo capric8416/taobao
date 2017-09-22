@@ -2,7 +2,7 @@
 import re
 import lxml
 import json
-import furl
+import traceback
 import scrapy
 from datetime import datetime
 from taobao_suk import items
@@ -127,7 +127,11 @@ class GoodsGrab(RedisSpider):
             base_info['original_price_min'] = float(original_price[0])
             base_info['original_price_max'] = float(original_price[-1])
         else:
-            base_info['original_price_min'] = base_info['original_price_max'] = float(original_price[0])
+            try:
+                base_info['original_price_min'] = base_info['original_price_max'] = float(original_price[0])
+            except:
+                self.logger.error(traceback.format_exc())
+                self.logger.error(base_info['price'])
 
         yield items.TaobaoSukItem(detail={'goods_info': base_info})
 
