@@ -88,7 +88,8 @@ class TaobaoSukPipeline(object):
             # add keyword sales_volume
             query_goods_list = \
                 self.db['goods_list'].find({'id': goods_info_['goods_id']}).sort('modified', -1).limit(1) \
-                or {'keyword': '', 'sales_volume': ''}
+                or [{'keyword': '', 'sales_volume': ''}]
+            query_goods_list = query_goods_list[0]
             dict_item['goods_info']['keyword'] = query_goods_list['keyword']
             dict_item['goods_info']['sales_volume'] = query_goods_list['sales_volume']
 
