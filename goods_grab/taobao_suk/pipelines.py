@@ -85,6 +85,13 @@ class TaobaoSukPipeline(object):
                 self.db['name_mapping'].find_one({'goods_id': goods_info_['goods_id']}) or {'goods_name': ''}
             dict_item['goods_info']['standard_name'] = query_name_mapping['goods_name']
 
+            # add keyword sales_volume
+            query_goods_list = \
+                self.db['goods_list'].find_one({'id': goods_info_['goods_id']}) \
+                or {'keyword': '', 'sales_volume': ''}
+            dict_item['goods_info']['keyword'] = query_goods_list['keyword']
+            dict_item['goods_info']['sales_volume'] = query_goods_list['sales_volume']
+
             self.db['daily_master'].insert(dict_item['goods_info'])
             spider.logger.debug(dict_item['goods_info'])
 
