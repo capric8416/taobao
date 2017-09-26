@@ -521,12 +521,11 @@ class Dispatcher(object):
 
         for keyword in await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS].find(
                 {'date': {'$gte': date}}).distinct('keyword'):
-            self.logger.info('{0} {1}'.format(datetime.now(), keyword))
-
             goods_list = await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS].find(
                 {'date': {'$gte': date}, 'keyword': keyword}).sort(
-                [('sales_volume', pymongo.DESCENDING)]).limit(limit=limit)
-            goods_list = list(goods_list)
+                [('sales_volume', pymongo.DESCENDING)]).limit(limit=limit).to_list(length=limit)
+
+            self.logger.info('{} {} {}'.format(datetime.now(), keyword, len(goods_list)))
 
             for i in range(0, len(goods_list), 100):
                 items = goods_list[i: i + 100]
@@ -554,9 +553,14 @@ class Dispatcher(object):
 
             await asyncio.sleep(10)
 
+    async def stop_manually(self, date):
+        await self._connect_storage()
+        await self.dump_main_goods(date=date)
+
 
 if __name__ == '__main__':
     dispatcher = Dispatcher(workers=20, shops_per_proxy=10)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(dispatcher.run())
+    # loop.run_until_complete(dispatcher.stop_manually(date=datetime(2017, 9, 20, 0, 32, 29, 923000)))
