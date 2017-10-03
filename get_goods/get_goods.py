@@ -53,7 +53,7 @@ class AuthError(Exception):
 
 
 class GetShopItemList(aiohttp.ClientSession):
-    def __init__(self, delay=3, timeout=15, user_agent='', proxy=None):
+    def __init__(self, delay=3, timeout=10, user_agent='', proxy=None):
         super(GetShopItemList, self).__init__()
 
         self.logger = get_logger('@@@@')
@@ -390,7 +390,10 @@ class Dispatcher(object):
                             goods_list = await client.search(shop_id=int(shop_id), query=query)
                         except Exception as e:
                             self.logger.exception(e)
-                            await self._add_shop_info(redis_client=redis_client, shop_info=shop_info)
+                            if not isinstance(e, KeyError):
+                                await self._add_shop_info(redis_client=redis_client, shop_info=shop_info)
+                            else:
+                                self.logger.error(f'{shop_id}, {e}')
 
                             i = 10
                         else:
@@ -505,7 +508,7 @@ class Dispatcher(object):
                 'start': start, 'end': end, 'date': today, 'count': count
             })
 
-            self.dump_main_goods(date=today)
+            await self.dump_main_goods(date=start)
 
             translate = TranslateGoodsName(mapping_excel='')
             translate.update_goods_main(collection_name=MONGO_COLLECTION_GOODS_MAIN)
@@ -556,6 +559,9 @@ class Dispatcher(object):
     async def stop_manually(self, date):
         await self._connect_storage()
         await self.dump_main_goods(date=date)
+
+        translate = TranslateGoodsName(mapping_excel='')
+        translate.update_goods_main(collection_name=MONGO_COLLECTION_GOODS_MAIN)
 
 
 if __name__ == '__main__':
