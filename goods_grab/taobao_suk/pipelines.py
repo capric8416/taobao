@@ -77,7 +77,7 @@ class TaobaoSukPipeline(object):
             else:
                 quantity = totalQuantity_today
 
-            dict_item['goods_info']['total_quantity_yesterday'] = int(quantity)
+            dict_item['goods_info']['inventory_yesterday'] = int(quantity)
             dict_item['goods_info']['Daily_Sales'] = int(quantity) - int(totalQuantity_today)
 
             # add standard_name

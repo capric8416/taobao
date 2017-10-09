@@ -94,16 +94,17 @@ class GoodsGrab(RedisSpider):
         item['price'] = data.get('promotion', {}).get('promoData', {}).get('def', [{}])[0].get('price', 0) \
                         or data.get('price', 0)
 
-        item['sell_count'] = data.get('soldQuantity', {}).get('confirmGoodsCount', 0)  # 月销量
-        item['totalQuantity'] = data.get('dynStock', {}).get('sellableQuantity', 0)  # 库存
+        item['month_sold_quantity'] = data.get('soldQuantity', {}).get('confirmGoodsCount', 0)  # 月销量
+        item['inventory'] = data.get('dynStock', {}).get('sellableQuantity', 0)  # 库存
         item['deliveryAddress'] = data.get('deliveryFee', {}).get('data', {}).get('sendCity', '')  # 发货地
 
         price = str(item['price']).split('-')
         if len(price) >= 2:
             # 30天销售额
-            item['month_sales'] = str(item['sell_count'] * float(price[0])) + '-' + str(item['sell_count'] * float(price[-1]))
+            item['month_sold_amount'] = str(item['month_sold_quantity'] * float(price[0])) + '-' + \
+                                  str(item['month_sold_quantity'] * float(price[-1]))
         else:
-            item['month_sales'] = item['sell_count'] * float(price[0])
+            item['month_sold_amount'] = item['month_sold_quantity'] * float(price[0])
 
         base_info = response.meta['data']
         base_info.update(item)
@@ -196,11 +197,11 @@ class GoodsGrab(RedisSpider):
         text = response.text
 
         item['price'] = ''
-        item['sell_count'] = int(self.regular_expression_match(r'"sellCount":(\d*?)\,', text, 0))  # 销量
+        item['month_sold_quantity'] = int(self.regular_expression_match(r'"sellCount":(\d*?)\,', text, 0))  # 销量
         item['deliveryAddress'] = self.regular_expression_match(r'"deliveryAddress":(.*?),', text, '')
 
         item['rate_counts'] = self.regular_expression_match(r'"commentCount":(\d+?),', text, 0)  # 累计评价
-        item['totalQuantity'] = int(self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, '0'))  # 库存
+        item['inventory'] = int(self.regular_expression_match(r'"totalQuantity":(\d*?)\,', text, '0'))  # 库存
 
         text = tree.xpath('//script[contains(text(), "_DATA_Mdskip")]/text()')
         text = text[0] if text else '{}'
@@ -209,8 +210,8 @@ class GoodsGrab(RedisSpider):
         # json_text = self.regular_expression_match(r'var _DATA_Mdskip =([\s\S]*) </script>', text, '{}')
         # if not json_text:
         #     json_text = self.regular_expression_match(r'var _DATA_Mdskip =\s({.*?})\s</script>', text, '{}')
-        if not item['totalQuantity']: 
-            item['totalQuantity'] = self.regular_expression_match(r'"quantity":(\d+)', json_text, 0)
+        if not item['inventory']:
+            item['inventory'] = self.regular_expression_match(r'"quantity":(\d+)', json_text, 0)
         try:
             json_item = json.loads(json_text)
         except Exception as e:
@@ -238,11 +239,11 @@ class GoodsGrab(RedisSpider):
         price = str(item['price']).split('-')
         if len(price) >= 2:
             # 30天销售额
-            item['month_sales'] = str(item['sell_count'] * float(price[0])) + '-' + str(item['sell_count'] * float(price[-1]))
+            item['month_sold_amount'] = str(item['month_sold_quantity'] * float(price[0])) + '-' + str(item['month_sold_quantity'] * float(price[-1]))
             item['price_min'] = float(price[0])
             item['price_max'] = float(price[-1])
         else:
-            item['month_sales'] = item['sell_count'] * float(price[0])
+            item['month_sold_amount'] = item['month_sold_quantity'] * float(price[0])
             item['price_min'] = item['price_max'] = float(price[0])
 
         # add original_price_min original_price_max
