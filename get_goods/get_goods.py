@@ -241,9 +241,9 @@ class GetShopItemList(aiohttp.ClientSession):
                         'title': PyQuery(item['title']).text().strip(),
                         'price_highlight': float(item['price']),
                         'price_del': None,
-                        'sales': int(item['sold']),
-                        'sales_volume': int(item['totalSoldQuantity']),
-                        'quantity': int(item['quantity']),
+                        'month_sold_quantity': int(item['sold']),
+                        'total_sold_quantity': int(item['totalSoldQuantity']),
+                        'inventory': int(item['quantity']),
                         'raw': item,
                         'date': datetime.fromordinal(today.toordinal()),
                         'modified': now,
@@ -269,9 +269,9 @@ class GetShopItemList(aiohttp.ClientSession):
                         'title': item['title'],
                         'price_highlight': float(item['salePrice']),
                         'price_del': float(item['reservePrice']) if item['reservePrice'] else None,
-                        'sales': int(item['sold']),
-                        'sales_volume': int(item['totalSoldQuantity']),
-                        'quantity': int(item['quantity']),
+                        'month_sold_quantity': int(item['sold']),
+                        'total_sold_quantity': int(item['totalSoldQuantity']),
+                        'inventory': int(item['quantity']),
                         'raw': item,
                         'date': datetime.fromordinal(today.toordinal()),
                         'modified': now,
@@ -508,14 +508,14 @@ class Dispatcher(object):
                 'start': start, 'end': end, 'date': today, 'count': count
             })
 
-            await self.dump_main_goods(date=start)
+            await self.dump_main_goods(dt=start)
 
             translate = TranslateGoodsName(mapping_excel='')
             translate.update_goods_main(collection_name=MONGO_COLLECTION_GOODS_MAIN)
 
             self.logger.info('{0} {1} -> {2} = {3} {0}'.format('=' * 40, start, end, count))
 
-    async def dump_main_goods(self, date=datetime.fromordinal(datetime.today().toordinal()), limit=3000):
+    async def dump_main_goods(self, dt=datetime.now(), limit=3000):
         self.logger.info('>' * 100)
 
         await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS_MAIN].create_index([
@@ -523,10 +523,10 @@ class Dispatcher(object):
         ])
 
         for keyword in await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS].find(
-                {'date': {'$gte': date}}).distinct('keyword'):
+                {'modified': {'$gte': dt}}).distinct('keyword'):
             goods_list = await self.mongo_client[MONGO_DB][MONGO_COLLECTION_GOODS].find(
-                {'date': {'$gte': date}, 'keyword': keyword}).sort(
-                [('sales_volume', pymongo.DESCENDING)]).limit(limit=limit).to_list(length=limit)
+                {'modified': {'$gte': dt}, 'keyword': keyword}).sort(
+                [('month_sold_quantity', pymongo.DESCENDING)]).limit(limit=limit).to_list(length=limit)
 
             self.logger.info('{} {} {}'.format(datetime.now(), keyword, len(goods_list)))
 
@@ -556,9 +556,9 @@ class Dispatcher(object):
 
             await asyncio.sleep(10)
 
-    async def stop_manually(self, date):
+    async def stop_manually(self, dt):
         await self._connect_storage()
-        await self.dump_main_goods(date=date)
+        await self.dump_main_goods(dt=dt)
 
         translate = TranslateGoodsName(mapping_excel='')
         translate.update_goods_main(collection_name=MONGO_COLLECTION_GOODS_MAIN)
