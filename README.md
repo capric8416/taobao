@@ -52,6 +52,8 @@ python3.6 -m venv env1
 env1/bin/pip install -r requirements.txt
 python3.6 -m venv env2
 env2/bin/pip install -r requirements.txt
+cd ~/data/taobao/env2/lib64/python3.6/site-packages
+ln -s ~/data/proxy_swift/proxy_swift .
 ```
 
 
@@ -61,7 +63,7 @@ apt install -y supervisor
 cd /etc/
 rm -rf supervisor/
 ln -s ~/data/taobao/system/etc/supervisor .
-supervisord -c /etc/supervisor/supervisord.conf
+supervisord -c /etc/supervisor/supervisord.conf  # unlink /var/run/supervisor.sock if Error: Another program is already listening on a port that one of our HTTP servers is configured to use
 ```
 
 
