@@ -1,0 +1,42 @@
+# Edit this file to introduce tasks to be run by cron.
+# 
+# Each task to run has to be defined through a single line
+# indicating with different fields when the task will be run
+# and what command to run for the task
+# 
+# To define the time you can provide concrete values for
+# minute (m), hour (h), day of month (dom), month (mon),
+# and day of week (dow) or use '*' in these fields (for 'any').# 
+# Notice that tasks will be started based on the cron's system
+# daemon's notion of time and timezones.
+# 
+# Output of the crontab jobs (including errors) is sent through
+# email to the user the crontab file belongs to (unless redirected).
+# 
+# For example, you can run a backup of all your user accounts
+# at 5 a.m every week with:
+# 0 5 * * 1 tar -zcf /var/backups/home.tgz /home/
+# 
+# For more information see the manual pages of crontab(5) and cron(8)
+# 
+# m h  dom mon dow   command
+# 第1列分钟0~59
+# 第2列小时0~23 (0表示子夜)
+# 第3列日1~31
+# 第4列月1~12
+# 第5列星期0~7 (0和7都表示星期天)
+# 第6列要运行的命令
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
+
+# empty tmp
+#0 * * * * /usr/bin/task_empty_tmp &>/root/data/logs/taobao/cron_tasks/empty_tmp.log
+
+# shop_list spider
+0 0 * * * /usr/local/bin/supervisorctl start shop_list &>/root/data/logs/taobao/cron_tasks/shop_list.log
+
+# goods_list spider
+#0 0 * * * /usr/bin/task_goods_list &>/root/data/logs/taobao/cron_tasks/goods_list.log
+
+# goods_detail spider
+0 0 * * * /usr/local/bin/supervisorctl restart goods_detail &>/root/data/logs/taobao/cron_tasks/goods_detail.log

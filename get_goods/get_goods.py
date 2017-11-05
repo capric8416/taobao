@@ -102,6 +102,11 @@ class GetShopItemList(aiohttp.ClientSession):
         self.search_keyword = query
 
         resp = await self._open(shop_id=shop_id, query=query)
+        html = await resp.text()
+        title = PyQuery(html)('title').text().strip()
+        if any(['找不到店铺' in title, '店铺找不到' in title, '找不到页面' in title, '页面找不到' in title]):
+            return []
+
         if resp.url.host == self.host_error_taobao:
             raise AuthError('访问受限')
 
