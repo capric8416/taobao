@@ -101,8 +101,7 @@ class GetShopItemList(aiohttp.ClientSession):
     async def search(self, shop_id, query):
         self.search_keyword = query
 
-        resp = await self._open(shop_id=shop_id, query=query)
-        html = await resp.text()
+        resp, html = await self._open(shop_id=shop_id, query=query)
         title = PyQuery(html)('title').text().strip()
         if any(['找不到店铺' in title, '店铺找不到' in title, '找不到页面' in title, '页面找不到' in title]):
             return []
@@ -172,8 +171,8 @@ class GetShopItemList(aiohttp.ClientSession):
         url = f'http://shop.m.taobao.com/shop/shop_index.htm?shop_id={shop_id}#list?q={parse.quote(query)}'
         self.search_url = url
 
-        resp = await self._request_data(url=url)
-        return resp
+        resp, html = await self._request_data(url=url, as_resp_text=True)
+        return resp, html
 
     async def _search(self, shop_id, shop_type, hostname, query, page=1):
         if shop_type == self.taobao:
@@ -289,6 +288,7 @@ class GetShopItemList(aiohttp.ClientSession):
     async def _request_data(self, *args, **kwargs):
         as_text = kwargs.pop('as_text', False)
         as_json = kwargs.pop('as_json', False)
+        as_resp_text = kwargs.pop('as_resp_text', False)
 
         kwargs = copy.deepcopy(kwargs)
         kwargs['timeout'] = self.timeout
@@ -301,6 +301,8 @@ class GetShopItemList(aiohttp.ClientSession):
                 return await resp.json()
             elif as_text:
                 return await resp.text()
+            elif as_resp_text:
+                return resp, await resp.text()
             else:
                 return resp
 
@@ -457,7 +459,7 @@ class Dispatcher(object):
                     url = self.proxy_service_url + '/restart' + ('?full=1' if full_restart else '')
                     async with client.get(url) as resp:
                         data = await resp.json()
-                        self.workers = min(self.workers, len(data['interfaces']) * 3 // 4)
+                        self.workers = min(self.workers, len(data['interfaces']) * 4 // 5)
             except Exception as e:
                 self.logger.exception(e)
                 await asyncio.sleep(1)
@@ -574,4 +576,4 @@ if __name__ == '__main__':
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(dispatcher.run())
-    # loop.run_until_complete(dispatcher.stop_manually(date=datetime(2017, 9, 20, 0, 32, 29, 923000)))
+    # loop.run_until_complete(dispatcher.stop_manually(dt=datetime(2017, 9, 20, 0, 32, 29, 923000)))
