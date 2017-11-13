@@ -88,10 +88,10 @@ class TaobaoSukPipeline(object):
             # add keyword sales_volume
             query_goods_list = \
                 self.db['goods_list'].find({'id': goods_info_['goods_id']}).sort('modified', -1).limit(1) \
-                or [{'keyword': '', 'sales_volume': ''}]
+                or [{'keyword': '', 'total_sold_quantity': 0}]
             query_goods_list = query_goods_list[0]
             dict_item['goods_info']['keyword'] = query_goods_list['keyword']
-            dict_item['goods_info']['sales_volume'] = query_goods_list['sales_volume']
+            dict_item['goods_info']['total_sold_quantity'] = query_goods_list['total_sold_quantity']
 
             self.db['daily_master'].insert(dict_item['goods_info'])
             spider.logger.debug(dict_item['goods_info'])
