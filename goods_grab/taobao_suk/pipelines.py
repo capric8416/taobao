@@ -66,19 +66,19 @@ class TaobaoSukPipeline(object):
             spider.logger.debug(dict_item)
 
             goods_info_ = dict_item['goods_info']
-            totalQuantity_today = goods_info_['totalQuantity']
+            inventory_today = goods_info_['inventory']
             date = datetime.today() - timedelta(days=1)
             date = date.toordinal()
             date = datetime.fromordinal(date)
             query_item = self.db['goods_info'].find_one({'goods_id': goods_info_['goods_id'], 'date': date})
 
             if query_item:
-                quantity = query_item.get('totalQuantity', totalQuantity_today)
+                quantity = query_item.get('inventory', inventory_today)
             else:
-                quantity = totalQuantity_today
+                quantity = inventory_today
 
             dict_item['goods_info']['inventory_yesterday'] = int(quantity)
-            dict_item['goods_info']['Daily_Sales'] = int(quantity) - int(totalQuantity_today)
+            dict_item['goods_info']['Daily_Sales'] = int(quantity) - int(inventory_today)
 
             # add standard_name
             query_name_mapping = \
