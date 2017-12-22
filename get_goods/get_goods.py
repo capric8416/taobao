@@ -228,7 +228,7 @@ class GoodsSniffer(Sniffer):
             self.tab.wait(timeout=3)
             return not self.tab.click('div#gl-pagenav a.c-p-next:not(.c-btn-off)', limit_one=True)
         else:
-            self.tab.Runtime.evaluate(expression='document.body.scrollTop += document.body.scrollHeight')
+            self.tab.Runtime.evaluate(expression='window.scrollBy(0, window.innerHeight)')
             return self.tab.wait(selector='//section[@class="state" and contains(text(), "已经看到最后啦~")]', timeout=3)
 
     def extract_data(self, host):
